@@ -42,10 +42,11 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
-  build:
+  check:
     name: typecheck + lint + test
     runs-on: ubuntu-latest
     steps:
