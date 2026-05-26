@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ServiceNowClient } from '../servicenow/client.js';
+import { createSchemaCache } from '../servicenow/schema-cache.js';
 import { createListTablesTool } from './tools/list-tables.js';
 import { createDescribeTableTool } from './tools/describe-table.js';
 import { createQueryTableTool } from './tools/query-table.js';
@@ -16,7 +17,7 @@ export function createMcpServer(client: ServiceNowClient): McpServer {
 
   for (const tool of [
     createListTablesTool(client),
-    createDescribeTableTool(client),
+    createDescribeTableTool(client, createSchemaCache({ ttlMs: 0, maxEntries: 0 })),
     createQueryTableTool(client),
     createGetRecordTool(client),
     createGetAttachmentTool(client),
