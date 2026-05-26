@@ -82,25 +82,26 @@ export interface SchemaCache<T> {
 
 ### Wiring
 
-In `src/servicenow/table-api.ts`:
+`describe_table` and `list_tables` are MCP tools that resolve `sys_db_object` / `sys_dictionary` via `client.table.query` inside their handlers — not `table-api` methods. The cache wraps those handlers.
 
-- One cache instance for `describeTable` results, keyed by `tableName`.
-- One cache instance for `listTables` results, keyed by a single literal `"__all__"` (the list is global).
-- Cache is constructed at module init from config; tests can inject their own.
+- One cache instance for `describe_table` results, keyed by `tableName`.
+- One cache instance for `list_tables` results, keyed by the literal `"__all__"` (the list is global; the `filter` arg is applied after cache read).
+- Caches are constructed in `src/mcp/server.ts` (where the tools are wired) and injected into `createDescribeTableTool(client, cache)` and `createListTablesTool(client, cache)`. Tests can pass their own cache instances.
 
 ### Config (`src/config.ts`)
 
 - `SCHEMA_CACHE_TTL_MS`: integer ≥ 0, default `300000` (5 minutes).
 - `SCHEMA_CACHE_MAX_ENTRIES`: integer ≥ 1, default `256`.
-- Both Zod-validated; invalid values fail fast at startup.
+- Validated with the existing `ConfigError` pattern (manual checks, no Zod) for consistency with the rest of `loadConfig`.
 
-### Tests (`src/servicenow/schema-cache.test.ts` + updates to `table-api.test.ts`)
+### Tests (`src/servicenow/schema-cache.test.ts` + updates to the tool tests)
 
 - Hit returns cached value without calling the HTTP layer.
 - Miss after expiry triggers a fresh fetch.
 - Eviction drops oldest entry when full.
 - `ttlMs: 0` disables caching end-to-end.
-- `table-api` integration: second `describeTable` call with same name doesn't re-hit the HTTP boundary.
+- `describe_table` integration: second call with same name doesn't re-hit `client.table.query`.
+- `list_tables` integration: `filter` arg is applied on the cached result, not the request.
 
 ---
 
@@ -129,11 +130,11 @@ export interface AuthProvider {
 }
 ```
 
-#### `BasicAuthProvider`
+#### `BasicAuthProvider` and `BearerStaticAuthProvider`
 
-- Returns `Basic ${base64(user:password)}` synchronously.
-- `onUnauthorized` is a no-op (basic auth doesn't refresh).
-- Behavior identical to today's inline header construction — this is a pure refactor.
+- `BasicAuthProvider`: returns `Basic ${base64(user:password)}`. `onUnauthorized` no-op.
+- `BearerStaticAuthProvider`: returns `Bearer ${token}` (the existing `SNOW_OAUTH_TOKEN` path). `onUnauthorized` no-op.
+- Both wrap today's inline header construction — pure refactor of `buildAuthHeader` into provider classes.
 
 #### `OAuthClientCredentialsProvider`
 
@@ -172,16 +173,17 @@ transport/
 
 ### Config additions (`src/config.ts`)
 
-| Var                        | Type                 | Default       | Notes                                    |
-| -------------------------- | -------------------- | ------------- | ---------------------------------------- |
-| `SNOW_AUTH`                | `"basic" \| "oauth"` | `"basic"`     | Selects auth provider.                   |
-| `SNOW_OAUTH_CLIENT_ID`     | string               | —             | Required when `SNOW_AUTH=oauth`.         |
-| `SNOW_OAUTH_CLIENT_SECRET` | string               | —             | Required when `SNOW_AUTH=oauth`.         |
-| `MCP_TRANSPORT`            | `"stdio" \| "http"`  | `"stdio"`     | Selects MCP transport.                   |
-| `MCP_HTTP_PORT`            | integer 1–65535      | `3000`        | Used when `MCP_TRANSPORT=http`.          |
-| `MCP_HTTP_HOST`            | string               | `"127.0.0.1"` | Bind address. Localhost-only by default. |
+Auth selection stays implicit (which env vars are set), matching the existing `SNOW_OAUTH_TOKEN` / `SNOW_USER`+`SNOW_PASSWORD` convention. Priority: client_credentials > static bearer > basic.
 
-All Zod-validated. Conditional requirement (`oauth` ⇒ id+secret present) enforced via `superRefine` and fails fast at startup with a clear message.
+| Var                        | Type                | Default       | Notes                                            |
+| -------------------------- | ------------------- | ------------- | ------------------------------------------------ |
+| `SNOW_OAUTH_CLIENT_ID`     | string              | —             | Pair with `SNOW_OAUTH_CLIENT_SECRET` → OAuth cc. |
+| `SNOW_OAUTH_CLIENT_SECRET` | string              | —             | Required together with `SNOW_OAUTH_CLIENT_ID`.   |
+| `MCP_TRANSPORT`            | `"stdio" \| "http"` | `"stdio"`     | Selects MCP transport.                           |
+| `MCP_HTTP_PORT`            | integer 1–65535     | `3000`        | Used when `MCP_TRANSPORT=http`.                  |
+| `MCP_HTTP_HOST`            | string              | `"127.0.0.1"` | Bind address. Localhost-only by default.         |
+
+A new `kind: 'oauth_client_credentials'` is added to `AuthConfig`. Validation uses the existing manual `ConfigError` pattern (no Zod) for consistency with the rest of `loadConfig`. Partial OAuth config (only id or only secret) is rejected at parse time with a clear message.
 
 ### Tests
 
@@ -189,7 +191,7 @@ All Zod-validated. Conditional requirement (`oauth` ⇒ id+secret present) enfor
 - `auth/oauth-client-credentials-provider.test.ts`: first call fetches token; second call within TTL is cached; `onUnauthorized` forces refresh; token-endpoint failure surfaces as a translated error.
 - `http/client.test.ts`: existing tests still pass; new test asserts 401 triggers exactly one retry through the provider.
 - `mcp/transport/http.test.ts`: spin up the HTTP transport on an ephemeral port, connect an in-process MCP client, invoke `list_tables`, expect a normal response.
-- `config.test.ts`: missing OAuth credentials with `SNOW_AUTH=oauth` rejects at parse time.
+- `config.test.ts`: partial OAuth credentials (only id or only secret) reject at parse time; full pair produces `kind: 'oauth_client_credentials'`; priority order (client_credentials > token > basic) is enforced when multiple sets are present.
 
 ---
 
