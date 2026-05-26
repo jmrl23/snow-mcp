@@ -219,6 +219,13 @@ After the client restarts, ask it to list available MCP tools. You should
 see eight tools under `snow-mcp` (see §5) and one resource
 (`servicenow://tables`).
 
+### Running in Docker
+
+The repo ships a multi-stage Dockerfile with a distroless runtime
+stage. See the [Docker](README.md#docker) section in the README for
+build/run commands. The container defaults to the HTTP transport on
+port `17880`.
+
 ---
 
 ## 5. Tool reference

@@ -421,6 +421,63 @@ yarn format:check # prettier --check .
 
 ---
 
+## Docker
+
+The repo ships a multi-stage Dockerfile that produces a minimal,
+distroless runtime image. The builder stage compiles TypeScript on
+`node:24-alpine`; the final image is
+`gcr.io/distroless/nodejs24-debian12:nonroot` with only
+`dist/`, production `node_modules`, and `package.json` copied in.
+
+### Build
+
+```bash
+docker build -t snow-mcp:local .
+```
+
+### Run
+
+The container defaults to the Streamable HTTP transport on port
+`17880` and binds `0.0.0.0` inside the container. Pass credentials
+via `--env-file` and map the port to the host:
+
+```bash
+docker run --rm \
+  --env-file .env \
+  -p 17880:17880 \
+  snow-mcp:local
+```
+
+### Compose
+
+```bash
+docker compose up --build
+```
+
+The provided `docker-compose.yml` reads ServiceNow credentials from
+`.env` and forces `MCP_TRANSPORT=http`, `MCP_HTTP_HOST=0.0.0.0`,
+`MCP_HTTP_PORT=17880`.
+
+### Use a different port
+
+The container's bind port is `MCP_HTTP_PORT` (default `17880`).
+Override both the env var and the published port together:
+
+```bash
+docker run --rm \
+  --env-file .env \
+  -e MCP_HTTP_PORT=8443 \
+  -p 8443:8443 \
+  snow-mcp:local
+```
+
+### Updating tables of project layout
+
+No need — `Dockerfile`, `.dockerignore`, and `docker-compose.yml` at
+the repo root are visible in the existing tree.
+
+---
+
 ## Testing
 
 Framework: **Vitest**. Tests live next to source as `*.test.ts`.
@@ -516,6 +573,9 @@ snow-mcp/
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── eslint.config.js
+├── Dockerfile
+├── .dockerignore
+├── docker-compose.yml
 ├── src/
 │   ├── main.ts               # entry point (selects transport from config)
 │   ├── config.ts             # env parsing & validation
