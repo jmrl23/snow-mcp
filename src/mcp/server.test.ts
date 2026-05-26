@@ -14,7 +14,7 @@ function fakeClient(): ServiceNowClient {
 
 describe('createMcpServer', () => {
   it('registers the 8 tools and the tables resource', () => {
-    const server = createMcpServer(fakeClient());
+    const server = createMcpServer(fakeClient(), { ttlMs: 0, maxEntries: 1 });
     // McpServer exposes lower-level Server via .server. We just confirm it built.
     expect(server.server).toBeDefined();
     // Indirect check: introspect registered tools via the internal map (test-only access).

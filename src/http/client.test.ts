@@ -6,10 +6,12 @@ import type { ServerConfig } from '../config.js';
 const cfgBasic: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'basic', user: 'u', password: 'p' },
+  cache: { ttlMs: 0, maxEntries: 0 },
 };
 const cfgBearer: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'bearer', token: 'abc' },
+  cache: { ttlMs: 0, maxEntries: 0 },
 };
 
 function fakeFetch(): {

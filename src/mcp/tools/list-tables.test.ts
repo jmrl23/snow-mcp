@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createListTablesTool } from './list-tables.js';
 import type { ServiceNowClient } from '../../servicenow/client.js';
+import { createSchemaCache } from '../../servicenow/schema-cache.js';
 
 function clientWithTables(records: Record<string, unknown>[]): ServiceNowClient {
   return {
@@ -18,7 +19,11 @@ describe('list_tables tool', () => {
       { name: 'incident', label: 'Incident', super_class: 'task' },
       { name: 'cmdb_ci', label: 'Configuration Item' },
     ]);
-    const tool = createListTablesTool(client);
+    const cache = createSchemaCache<{ name: string; label: string; super_class?: string }[]>({
+      ttlMs: 0,
+      maxEntries: 0,
+    });
+    const tool = createListTablesTool(client, cache);
     const out = await tool.handler({});
     const text = (out.content?.[0] as { text: string }).text;
     expect(text).toContain('"incident"');
@@ -31,10 +36,43 @@ describe('list_tables tool', () => {
       { name: 'change_request', label: 'Change Request' },
       { name: 'cmdb_ci', label: 'Configuration Item' },
     ]);
-    const tool = createListTablesTool(client);
+    const cache = createSchemaCache<{ name: string; label: string; super_class?: string }[]>({
+      ttlMs: 0,
+      maxEntries: 0,
+    });
+    const tool = createListTablesTool(client, cache);
     const out = await tool.handler({ filter: 'CHANGE' });
     const text = (out.content?.[0] as { text: string }).text;
     expect(text).toContain('change_request');
     expect(text).not.toContain('cmdb_ci');
+  });
+});
+
+describe('createListTablesTool with cache', () => {
+  it('caches the full table list and applies filter on the cached result', async () => {
+    let queryCount = 0;
+    const client = {
+      table: {
+        async query() {
+          queryCount += 1;
+          return {
+            records: [
+              { name: 'incident', label: 'Incident', super_class: 'task', sys_id: 'a' },
+              { name: 'change_request', label: 'Change Request', super_class: 'task', sys_id: 'b' },
+            ],
+          };
+        },
+      },
+    } as unknown as ServiceNowClient;
+    const cache = createSchemaCache<{ name: string; label: string; super_class?: string }[]>({
+      ttlMs: 60_000,
+      maxEntries: 10,
+    });
+    const tool = createListTablesTool(client, cache);
+
+    await tool.handler({});
+    await tool.handler({ filter: 'incident' });
+
+    expect(queryCount).toBe(1);
   });
 });

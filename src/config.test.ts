@@ -58,4 +58,37 @@ describe('loadConfig', () => {
   it('rejects when only SNOW_USER is set without SNOW_PASSWORD', () => {
     expect(() => loadConfig({ ...BASE, SNOW_USER: 'u' })).toThrow(ConfigError);
   });
+
+  it('defaults SCHEMA_CACHE_TTL_MS to 300000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.cache.ttlMs).toBe(300_000);
+  });
+
+  it('defaults SCHEMA_CACHE_MAX_ENTRIES to 256', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.cache.maxEntries).toBe(256);
+  });
+
+  it('parses SCHEMA_CACHE_TTL_MS=0 as disabled', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_TTL_MS: '0' });
+    expect(cfg.cache.ttlMs).toBe(0);
+  });
+
+  it('rejects non-integer SCHEMA_CACHE_TTL_MS', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_TTL_MS: 'abc' }),
+    ).toThrow(/SCHEMA_CACHE_TTL_MS/);
+  });
+
+  it('rejects negative SCHEMA_CACHE_TTL_MS', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_TTL_MS: '-1' })).toThrow(
+      /SCHEMA_CACHE_TTL_MS/,
+    );
+  });
+
+  it('rejects SCHEMA_CACHE_MAX_ENTRIES below 1', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_MAX_ENTRIES: '0' }),
+    ).toThrow(/SCHEMA_CACHE_MAX_ENTRIES/);
+  });
 });

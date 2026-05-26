@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
+import type { SchemaCache } from '../../servicenow/schema-cache.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 import { ServiceNowNotFoundError } from '../../errors.js';
 
@@ -14,7 +15,10 @@ export interface DescribeTableTool {
   handler(input: { name: string }): Promise<McpResult>;
 }
 
-export function createDescribeTableTool(client: ServiceNowClient): DescribeTableTool {
+export function createDescribeTableTool(
+  client: ServiceNowClient,
+  cache: SchemaCache<unknown>,
+): DescribeTableTool {
   return {
     name: 'describe_table',
     description:
@@ -22,6 +26,9 @@ export function createDescribeTableTool(client: ServiceNowClient): DescribeTable
     inputShape: describeTableInput,
     handler: (input) =>
       runTool(async () => {
+        const cached = cache.get(input.name);
+        if (cached !== undefined) return cached;
+
         const meta = await client.table.query<{
           name: string;
           label: string;
@@ -60,7 +67,7 @@ export function createDescribeTableTool(client: ServiceNowClient): DescribeTable
           limit: 1000,
           displayValue: 'all',
         });
-        return {
+        const out = {
           name: row.name,
           label: row.label,
           parent: row.super_class?.display_value ?? null,
@@ -73,6 +80,8 @@ export function createDescribeTableTool(client: ServiceNowClient): DescribeTable
             readOnly: f.read_only === 'true',
           })),
         };
+        cache.set(input.name, out);
+        return out;
       }),
   };
 }
