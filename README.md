@@ -2,7 +2,7 @@
 
 A **read-only Model Context Protocol (MCP) server** that exposes a
 ServiceNow instance to MCP-aware clients (Claude Code, Claude Desktop,
-Cursor, and any other stdio MCP client).
+Cursor, and any other MCP client — stdio or Streamable HTTP transport).
 
 It lets an LLM:
 
@@ -63,10 +63,12 @@ yarn build
 yarn start
 ```
 
-`yarn start` runs the server over **stdio**. It does not open a port — it
-is designed to be spawned as a child process by an MCP client. To verify
-configuration without a client, use `yarn dev` and watch for startup
-errors.
+By default, `yarn start` runs the server over **stdio**: no port is opened
+and the process is designed to be spawned as a child by an MCP client. Set
+`MCP_TRANSPORT=http` to expose the Streamable HTTP transport on
+`MCP_HTTP_HOST:MCP_HTTP_PORT` instead — see [Transport](#transport) below.
+To verify configuration without a client, use `yarn dev` and watch for
+startup errors.
 
 ---
 
@@ -78,12 +80,24 @@ is gitignored — never commit it).
 
 ### Required variables
 
-| Variable            | Required                      | Description                                                |
-| ------------------- | ----------------------------- | ---------------------------------------------------------- |
-| `SNOW_INSTANCE_URL` | always                        | Must start with `https://`. Trailing slashes are stripped. |
-| `SNOW_OAUTH_TOKEN`  | one of token **or** user+pass | Bearer token. Takes precedence when set.                   |
-| `SNOW_USER`         | required if no token          | ServiceNow user for HTTP Basic auth.                       |
-| `SNOW_PASSWORD`     | required if no token          | Password for HTTP Basic auth.                              |
+| Variable                   | Required                             | Description                                                  |
+| -------------------------- | ------------------------------------ | ------------------------------------------------------------ |
+| `SNOW_INSTANCE_URL`        | always                               | Must start with `https://`. Trailing slashes are stripped.   |
+| `SNOW_OAUTH_CLIENT_ID`     | with `SNOW_OAUTH_CLIENT_SECRET`      | OAuth client_credentials client id. Highest auth priority.   |
+| `SNOW_OAUTH_CLIENT_SECRET` | with `SNOW_OAUTH_CLIENT_ID`          | OAuth client_credentials secret. Must be paired with the id. |
+| `SNOW_OAUTH_TOKEN`         | one of: cc pair, token, or user+pass | Static bearer token. Used if no client_credentials pair.     |
+| `SNOW_USER`                | required if no cc pair and no token  | ServiceNow user for HTTP Basic auth.                         |
+| `SNOW_PASSWORD`            | required if no cc pair and no token  | Password for HTTP Basic auth.                                |
+
+See [Auth](#auth) below for the full selection priority.
+
+### Example — OAuth client_credentials
+
+```dotenv
+SNOW_INSTANCE_URL=https://your-instance.service-now.com
+SNOW_OAUTH_CLIENT_ID=abc123
+SNOW_OAUTH_CLIENT_SECRET=replace-me
+```
 
 ### Example — OAuth bearer
 
@@ -150,8 +164,12 @@ After a schema customization in ServiceNow, restart the server or wait for the T
 
 ## Connecting an MCP client
 
-The server speaks MCP over stdio, so any client that supports stdio MCP
-servers can launch it.
+By default the server speaks MCP over **stdio**: clients spawn it as a
+child process and exchange JSON-RPC frames on stdin/stdout. With
+`MCP_TRANSPORT=http`, the server instead listens on
+`MCP_HTTP_HOST:MCP_HTTP_PORT` (default `127.0.0.1:3000`) and clients
+connect to it via URL. Both transports expose the same tools and
+resources.
 
 ### Claude Code (CLI)
 
@@ -325,33 +343,38 @@ and table discovery without paying for repeated `list_tables` calls.
 
 ## Architecture
 
+```text
+┌────────────────────┐  stdio or HTTP (JSON-RPC) ┌────────────────────┐
+│   MCP client       │ ───────────────────────▶  │   snow-mcp         │
+│ (Claude Code, etc.)│ ◀───────────────────────  │ (this server)      │
+└────────────────────┘                           └─────────┬──────────┘
+                                                           │ HTTPS GET
+                                                           ▼
+                                                 ┌────────────────────┐
+                                                 │ ServiceNow REST    │
+                                                 │ /api/now/table/*   │
+                                                 │ /api/now/stats/*   │
+                                                 │ /api/now/attachment│
+                                                 └────────────────────┘
 ```
-┌────────────────────┐     stdio (JSON-RPC)     ┌────────────────────┐
-│   MCP client       │ ───────────────────────▶ │   snow-mcp         │
-│ (Claude Code, etc.)│ ◀─────────────────────── │ (this server)      │
-└────────────────────┘                          └─────────┬──────────┘
-                                                          │ HTTPS GET
-                                                          ▼
-                                                ┌────────────────────┐
-                                                │ ServiceNow REST    │
-                                                │ /api/now/table/*   │
-                                                │ /api/now/stats/*   │
-                                                │ /api/now/attachment│
-                                                └────────────────────┘
-```
+
+Transport is selected by `MCP_TRANSPORT` (default `stdio`; `http` for
+Streamable HTTP). See [Transport](#transport).
 
 Code layout (under `src/`):
 
-| Layer             | Purpose                                                             |
-| ----------------- | ------------------------------------------------------------------- |
-| `main.ts`         | Boot: load config, build client, start stdio MCP server.            |
-| `config.ts`       | Env parsing + validation. Throws `ConfigError` on bad input.        |
-| `errors.ts`       | Typed error hierarchy (`ServiceNowAuthError`, `…NotFoundError`, …). |
-| `http/`           | Fetch wrapper, retry/backoff, ServiceNow error translation.         |
-| `servicenow/`     | One module per ServiceNow API surface (table, aggregate, report …). |
-| `mcp/server.ts`   | Registers tools + resources on an `McpServer`.                      |
-| `mcp/tools/*`     | One file per MCP tool (input schema + handler).                     |
-| `mcp/resources/*` | MCP resources (currently: `servicenow://tables`).                   |
+| Layer              | Purpose                                                                 |
+| ------------------ | ----------------------------------------------------------------------- |
+| `main.ts`          | Boot: load config, build client, connect MCP transport (stdio or HTTP). |
+| `config.ts`        | Env parsing + validation. Throws `ConfigError` on bad input.            |
+| `errors.ts`        | Typed error hierarchy (`ServiceNowAuthError`, `…NotFoundError`, …).     |
+| `http/`            | Fetch wrapper, retry/backoff, ServiceNow error translation.             |
+| `servicenow/`      | One module per ServiceNow API surface (table, aggregate, report …).     |
+| `servicenow/auth/` | Auth providers (basic, static bearer, OAuth client_credentials).        |
+| `mcp/server.ts`    | Registers tools + resources on an `McpServer`.                          |
+| `mcp/tools/*`      | One file per MCP tool (input schema + handler).                         |
+| `mcp/resources/*`  | MCP resources (currently: `servicenow://tables`).                       |
+| `mcp/transport/*`  | Transport factory (`stdio.ts`, `http.ts`, `index.ts` selector).         |
 
 Transient ServiceNow errors (5xx, `429`, `ECONNRESET`) are retried with
 exponential backoff and jitter in `src/http/retry.ts`. 4xx auth /
@@ -465,7 +488,7 @@ yarn test src/servicenow
 
 ## Project layout
 
-```
+```text
 snow-mcp/
 ├── CLAUDE.md                 # project-wide guidance for Claude Code
 ├── README.md                 # you are here
@@ -473,20 +496,26 @@ snow-mcp/
 ├── .claude/
 │   └── rules/                # code-quality, testing, security, error-handling
 ├── .env                      # local credentials (gitignored)
+├── .env.example              # committed template of every env var
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── eslint.config.js
 ├── src/
-│   ├── main.ts               # stdio entry point
+│   ├── main.ts               # entry point (selects transport from config)
 │   ├── config.ts             # env parsing & validation
 │   ├── errors.ts             # typed error hierarchy
 │   ├── http/                 # fetch wrapper, retry, error translation
-│   ├── servicenow/           # ServiceNow REST API wrappers
+│   ├── servicenow/
+│   │   ├── client.ts         # composes the per-API modules
+│   │   ├── auth/             # AuthProvider + basic / bearer / oauth-cc
+│   │   ├── schema-cache.ts   # TTL+LRU cache used by describe_table/list_tables
+│   │   └── …                 # one file per ServiceNow API surface
 │   └── mcp/
 │       ├── server.ts         # registers tools + resources
 │       ├── tool-helpers.ts
 │       ├── tools/            # one file per MCP tool
+│       ├── transport/        # stdio.ts, http.ts, index.ts (selector)
 │       └── resources/        # MCP resources
 └── dist/                     # compiled output (yarn build)
 ```

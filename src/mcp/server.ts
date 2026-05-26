@@ -14,7 +14,8 @@ import { createGetUserContextTool } from './tools/get-user-context.js';
 import { createTablesResource } from './resources/tables.js';
 
 export function createMcpServer(client: ServiceNowClient, cacheConfig: CacheConfig): McpServer {
-  const server = new McpServer({ name: 'snow-mcp', version: '1.0.0' });
+  // NOTE: keep in sync with package.json "version". tsconfig rootDir=./src blocks importing it directly.
+  const server = new McpServer({ name: 'snow-mcp', version: '1.1.0' });
   const describeCache = createSchemaCache<unknown>(cacheConfig);
   const listCache = createSchemaCache<CachedRow[]>(cacheConfig);
 
