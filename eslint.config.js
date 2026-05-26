@@ -11,7 +11,19 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/consistent-type-imports': 'error',
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message:
+            'fetch() is only allowed inside src/http/client.ts. Use the HttpClient abstraction.',
+        },
+      ],
     },
+  },
+  {
+    files: ['src/http/client.ts'],
+    rules: { 'no-restricted-globals': 'off' },
   },
   prettier,
 );
