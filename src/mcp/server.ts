@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ServiceNowClient } from '../servicenow/client.js';
+import type { CacheConfig } from '../config.js';
 import { createSchemaCache } from '../servicenow/schema-cache.js';
-import { createListTablesTool } from './tools/list-tables.js';
+import { createListTablesTool, type CachedRow } from './tools/list-tables.js';
 import { createDescribeTableTool } from './tools/describe-table.js';
 import { createQueryTableTool } from './tools/query-table.js';
 import { createGetRecordTool } from './tools/get-record.js';
@@ -12,18 +13,14 @@ import { createRunSavedReportTool } from './tools/run-saved-report.js';
 import { createGetUserContextTool } from './tools/get-user-context.js';
 import { createTablesResource } from './resources/tables.js';
 
-export function createMcpServer(client: ServiceNowClient): McpServer {
+export function createMcpServer(client: ServiceNowClient, cacheConfig: CacheConfig): McpServer {
   const server = new McpServer({ name: 'snow-mcp', version: '1.0.0' });
+  const describeCache = createSchemaCache<unknown>(cacheConfig);
+  const listCache = createSchemaCache<CachedRow[]>(cacheConfig);
 
   for (const tool of [
-    createListTablesTool(
-      client,
-      createSchemaCache<{ name: string; label: string; super_class?: string }[]>({
-        ttlMs: 0,
-        maxEntries: 0,
-      }),
-    ),
-    createDescribeTableTool(client, createSchemaCache({ ttlMs: 0, maxEntries: 0 })),
+    createListTablesTool(client, listCache),
+    createDescribeTableTool(client, describeCache),
     createQueryTableTool(client),
     createGetRecordTool(client),
     createGetAttachmentTool(client),

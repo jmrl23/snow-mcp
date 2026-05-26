@@ -10,7 +10,7 @@ export const listTablesInput = {
     .describe('Case-insensitive substring matched against table name and label.'),
 };
 
-interface CachedRow {
+export interface CachedRow {
   name: string;
   label: string;
   super_class?: string;
