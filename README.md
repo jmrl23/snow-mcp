@@ -112,6 +112,17 @@ SNOW_PASSWORD=replace-me
 Failures throw a `ConfigError` and the process exits non-zero — secrets
 are **never** echoed in the error message.
 
+### Schema cache
+
+`describe_table` and `list_tables` cache results in memory to avoid repeated `sys_dictionary` and `sys_db_object` lookups. Defaults:
+
+| Variable                   | Default  | Notes                                       |
+| -------------------------- | -------- | ------------------------------------------- |
+| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache. |
+| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries per tool.        |
+
+After a schema customization in ServiceNow, restart the server or wait for the TTL to expire.
+
 ---
 
 ## Connecting an MCP client

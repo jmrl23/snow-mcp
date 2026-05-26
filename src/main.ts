@@ -7,7 +7,7 @@ import { createMcpServer } from './mcp/server.js';
 export function buildServer(env: NodeJS.ProcessEnv = process.env): McpServer {
   const config = loadConfig(env);
   const client = createServiceNowClient(config);
-  return createMcpServer(client);
+  return createMcpServer(client, config.cache);
 }
 
 async function main(): Promise<void> {

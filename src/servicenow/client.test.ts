@@ -5,6 +5,7 @@ import type { ServerConfig } from '../config.js';
 const cfg: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'bearer', token: 't' },
+  cache: { ttlMs: 0, maxEntries: 0 },
 };
 
 describe('createServiceNowClient', () => {

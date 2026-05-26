@@ -50,14 +50,21 @@ PROTECTED_PATTERNS=(
 )
 
 shopt -s nocasematch 2>/dev/null || true
-for pattern in "${PROTECTED_PATTERNS[@]}"; do
-  # Using bash case with nocasematch for case-insensitive glob match.
-  case "$BASENAME_LC" in
-    $pattern)
-      emit deny "Protected file: $BASENAME matches pattern '$pattern'"
-      ;;
-  esac
-done
+# Credential-free templates that share a sensitive prefix are allowlisted.
+case "$BASENAME_LC" in
+  .env.example|.env.sample)
+    ;;
+  *)
+    for pattern in "${PROTECTED_PATTERNS[@]}"; do
+      # Using bash case with nocasematch for case-insensitive glob match.
+      case "$BASENAME_LC" in
+        $pattern)
+          emit deny "Protected file: $BASENAME matches pattern '$pattern'"
+          ;;
+      esac
+    done
+    ;;
+esac
 
 # Sensitive directories (use lower-cased path for case-insensitive on mac/Windows).
 case "$PATH_LC" in
@@ -65,6 +72,8 @@ case "$PATH_LC" in
     emit deny "Cannot edit files inside .git/" ;;
   secrets/*|*/secrets/*)
     emit deny "Cannot edit files inside secrets/" ;;
+  .env.example|*/.env.example|.env.sample|*/.env.sample)
+    ;;
   .env|.env.*|*/.env|*/.env.*)
     emit deny "Cannot edit .env files" ;;
   .claude/hooks/*|*/.claude/hooks/*)
