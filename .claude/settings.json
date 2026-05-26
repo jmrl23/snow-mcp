@@ -28,7 +28,13 @@
       "Bash(git switch *)",
       "Bash(gh pr *)",
       "Bash(gh issue *)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Write(**/.env)",
+      "Write(**/.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)"
     ],
     "deny": [
       "Read(**/.env)",
@@ -36,13 +42,9 @@
       "Read(**/secrets/**)",
       "Read(**/*.pem)",
       "Read(**/*.key)",
-      "Write(**/.env)",
-      "Write(**/.env.*)",
       "Write(**/secrets/**)",
       "Write(**/*.pem)",
       "Write(**/*.key)",
-      "Edit(**/.env)",
-      "Edit(**/.env.*)",
       "Edit(**/secrets/**)",
       "Edit(**/*.pem)",
       "Edit(**/*.key)"
