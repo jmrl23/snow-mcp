@@ -48,13 +48,17 @@ export function createAggregateApi(http: HttpClient): AggregateApi {
       }
       const res = await http.request(`/api/now/stats/${encodeURIComponent(table)}`, { query });
       const ok = await ensureOk(res);
-      const body = (await ok.json()) as {
-        result?: Array<{
-          groupby_fields?: Array<{ field: string; value: string }>;
-          stats?: Record<string, unknown>;
-        }>;
+      type AggregateRow = {
+        groupby_fields?: Array<{ field: string; value: string }>;
+        stats?: Record<string, unknown>;
       };
-      const rows = body.result ?? [];
+      const body = (await ok.json()) as { result?: AggregateRow | AggregateRow[] };
+      // ServiceNow returns a single object when not grouped, an array when grouped.
+      const rows: AggregateRow[] = Array.isArray(body.result)
+        ? body.result
+        : body.result
+          ? [body.result]
+          : [];
       return rows.map((row) => ({
         group: Object.fromEntries((row.groupby_fields ?? []).map((g) => [g.field, g.value])),
         value: extractStat(row.stats ?? {}, opts),

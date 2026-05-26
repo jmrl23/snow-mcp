@@ -64,4 +64,20 @@ describe('AggregateApi.aggregate', () => {
     const api = createAggregateApi(client);
     await expect(api.aggregate('incident', { operation: 'sum' })).rejects.toThrow(/field/);
   });
+
+  it('handles non-grouped count where ServiceNow returns a single object, not an array', async () => {
+    // Live ServiceNow returns `{ result: { stats: { count: '7' } } }` for an
+    // ungrouped count call. The wrapper must normalise that to a single-row array.
+    const { client } = mockClient({ result: { stats: { count: '7' } } });
+    const api = createAggregateApi(client);
+    const out = await api.aggregate('incident', { operation: 'count' });
+    expect(out).toEqual([{ group: {}, value: 7 }]);
+  });
+
+  it('handles a missing/empty result field without crashing', async () => {
+    const { client } = mockClient({});
+    const api = createAggregateApi(client);
+    const out = await api.aggregate('incident', { operation: 'count' });
+    expect(out).toEqual([]);
+  });
 });
