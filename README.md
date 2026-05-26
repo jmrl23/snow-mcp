@@ -181,7 +181,7 @@ project-scoped `.claude/settings.json`:
   "mcpServers": {
     "snow-mcp": {
       "command": "node",
-      "args": ["/home/master/mcp/snow-mcp/dist/main.js"],
+      "args": ["/absolute/path/to/snow-mcp/dist/main.js"],
       "env": {
         "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
         "SNOW_OAUTH_TOKEN": "eyJraWQiOiI..."
