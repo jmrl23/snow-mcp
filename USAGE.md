@@ -1,7 +1,8 @@
 # snow-mcp — Connection & Usage
 
 Read-only MCP server that exposes a ServiceNow instance to MCP-aware clients
-(Claude Code, Claude Desktop, Cursor, any stdio MCP client).
+(Claude Code, Claude Desktop, Cursor, any MCP client over stdio or
+Streamable HTTP).
 
 This document covers:
 
@@ -19,9 +20,10 @@ This document covers:
 
 - **Node.js 24+** (the project uses ESM and modern Node APIs).
 - **Yarn** (the lockfile is `yarn.lock`).
-- A ServiceNow instance reachable over **HTTPS** and credentials for it — either:
-  - an **OAuth bearer token**, or
-  - a **username + password** for HTTP Basic auth.
+- A ServiceNow instance reachable over **HTTPS** and credentials for it — one of:
+  - **OAuth client_credentials** (`SNOW_OAUTH_CLIENT_ID` + `SNOW_OAUTH_CLIENT_SECRET`) — highest priority,
+  - an **OAuth bearer token** (`SNOW_OAUTH_TOKEN`), or
+  - a **username + password** (`SNOW_USER` + `SNOW_PASSWORD`) for HTTP Basic auth.
 
 The authenticated user only needs read access; the server never issues
 `POST` / `PUT` / `PATCH` / `DELETE` against ServiceNow.
@@ -33,16 +35,31 @@ The authenticated user only needs read access; the server never issues
 Configuration is read from environment variables (typically a project-local
 `.env` file). `.env` is gitignored — do not commit it.
 
-Create `/home/master/mcp/snow-mcp/.env` with **one** of the two auth forms:
+Create `/home/master/mcp/snow-mcp/.env` with **one** of three auth forms.
+Selection is implicit by which vars are set. **Priority:**
+`client_credentials > static bearer > basic`.
 
-### Option A — OAuth bearer token (preferred)
+### Option A — OAuth client_credentials (recommended for server-to-server)
+
+```dotenv
+SNOW_INSTANCE_URL=https://your-instance.service-now.com
+SNOW_OAUTH_CLIENT_ID=abc123
+SNOW_OAUTH_CLIENT_SECRET=replace-me
+```
+
+The server POSTs `${SNOW_INSTANCE_URL}/oauth_token.do` with
+`grant_type=client_credentials`, caches the token until 30s before
+expiry, and refreshes automatically (also on a 401 from the ServiceNow
+API).
+
+### Option B — OAuth bearer token
 
 ```dotenv
 SNOW_INSTANCE_URL=https://your-instance.service-now.com
 SNOW_OAUTH_TOKEN=eyJraWQiOiI...
 ```
 
-### Option B — Basic auth
+### Option C — Basic auth
 
 ```dotenv
 SNOW_INSTANCE_URL=https://your-instance.service-now.com
@@ -52,15 +69,43 @@ SNOW_PASSWORD=replace-me
 
 Rules enforced at startup (`src/config.ts`):
 
-| Variable            | Required              | Notes                                                  |
-| ------------------- | --------------------- | ------------------------------------------------------ |
-| `SNOW_INSTANCE_URL` | yes                   | Must start with `https://`. Trailing slashes stripped. |
-| `SNOW_OAUTH_TOKEN`  | one of A/B            | If present, takes precedence over user/password.       |
-| `SNOW_USER`         | required for Option B | Ignored when a bearer token is set.                    |
-| `SNOW_PASSWORD`     | required for Option B | Never logged. Never echoed in errors.                  |
+| Variable                   | Required              | Notes                                                                 |
+| -------------------------- | --------------------- | --------------------------------------------------------------------- |
+| `SNOW_INSTANCE_URL`        | yes                   | Must start with `https://`. Trailing slashes stripped.                |
+| `SNOW_OAUTH_CLIENT_ID`     | with CLIENT_SECRET    | OAuth cc client id. Highest priority. Must be paired with the secret. |
+| `SNOW_OAUTH_CLIENT_SECRET` | with CLIENT_ID        | OAuth cc secret. Never logged. Never echoed in errors.                |
+| `SNOW_OAUTH_TOKEN`         | one of A / B / C      | Static bearer; used when no client_credentials pair is set.           |
+| `SNOW_USER`                | required for Option C | Ignored when an OAuth credential is set.                              |
+| `SNOW_PASSWORD`            | required for Option C | Never logged. Never echoed in errors.                                 |
 
-If neither auth form is satisfied or the URL is missing/non-HTTPS, the
-process exits with a `ConfigError`.
+If no auth form is satisfied (or partial OAuth cc credentials, or the
+URL is missing/non-HTTPS), the process exits with a `ConfigError`.
+
+### Transport
+
+`MCP_TRANSPORT` selects how clients reach the server. **Default `stdio`.**
+
+| Variable        | Default     | Notes                                                  |
+| --------------- | ----------- | ------------------------------------------------------ |
+| `MCP_TRANSPORT` | `stdio`     | Set to `http` for the Streamable HTTP transport.       |
+| `MCP_HTTP_HOST` | `127.0.0.1` | Bind address. Only used when `MCP_TRANSPORT=http`.     |
+| `MCP_HTTP_PORT` | `3000`      | Bind port (1–65535). Only used when transport is HTTP. |
+
+The HTTP transport binds to localhost by default. To expose it to other
+machines, set `MCP_HTTP_HOST=0.0.0.0` and ensure your network/firewall
+is configured appropriately.
+
+### Schema cache
+
+`describe_table` and `list_tables` cache results in memory.
+
+| Variable                   | Default  | Notes                                       |
+| -------------------------- | -------- | ------------------------------------------- |
+| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache. |
+| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries per tool.        |
+
+After a schema customization in ServiceNow, restart the server or wait
+for the TTL to expire.
 
 ---
 
@@ -69,7 +114,7 @@ process exits with a `ConfigError`.
 ```bash
 yarn install        # one-time
 yarn build          # compiles TypeScript to dist/
-yarn start          # node dist/main.js — speaks MCP over stdio
+yarn start          # node dist/main.js
 ```
 
 For local development with live reload:
@@ -78,8 +123,11 @@ For local development with live reload:
 yarn dev            # tsx watch on src/main.ts
 ```
 
-The server uses the **MCP stdio transport** — it does not open a port. It is
-designed to be spawned as a child process by an MCP client.
+By default the server speaks **MCP over stdio**: it does not open a
+port and is designed to be spawned as a child process by an MCP client.
+Set `MCP_TRANSPORT=http` to expose the **Streamable HTTP** transport on
+`MCP_HTTP_HOST:MCP_HTTP_PORT` (default `127.0.0.1:3000`) — clients then
+connect by URL instead of spawning the binary.
 
 Sanity checks:
 
@@ -93,7 +141,9 @@ yarn test           # vitest run (unit tests only, no live ServiceNow)
 
 ## 4. Wiring into an MCP client
 
-Any MCP client that supports stdio servers can connect. Examples below.
+Most MCP clients spawn the server over stdio; some (e.g. claude.ai web
+or self-hosted gateways) connect to a Streamable HTTP endpoint. Both
+work — examples below cover the stdio pattern.
 
 ### Claude Code (CLI)
 
