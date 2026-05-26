@@ -25,6 +25,8 @@ export function createHttpClient(
     path: string,
     opts: RequestOptions = {},
   ): Promise<Response> {
+    // Cast forces TS to keep the runtime check even though `method` is typed `'GET'`.
+    // Callers may bypass the type via `as`, and this guard catches them.
     if ((method as string) !== ALLOWED_METHOD) {
       throw new ReadOnlyViolationError(method);
     }
