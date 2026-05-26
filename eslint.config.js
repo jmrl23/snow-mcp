@@ -22,7 +22,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/http/client.ts'],
+    files: ['src/http/client.ts', 'src/servicenow/auth/oauth-client-credentials-provider.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
   prettier,
