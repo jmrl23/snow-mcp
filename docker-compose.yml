@@ -1,0 +1,14 @@
+services:
+  snow-mcp:
+    build: .
+    image: snow-mcp:local
+    container_name: snow-mcp
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HTTP_HOST: 0.0.0.0
+      MCP_HTTP_PORT: 17880
+    ports:
+      - '17880:17880'
