@@ -54,14 +54,24 @@ a `ReadOnlyViolationError`.
 # 1. install
 yarn install
 
-# 2. create .env (see Configuration below)
-cp /dev/null .env
-$EDITOR .env
+# 2. set environment variables (see Configuration below for all vars)
+export SNOW_INSTANCE_URL=https://your-instance.service-now.com
+export SNOW_USER=integration.user
+export SNOW_PASSWORD=replace-me
+# or use SNOW_OAUTH_TOKEN / SNOW_OAUTH_CLIENT_ID + SNOW_OAUTH_CLIENT_SECRET
 
 # 3. compile and run
 yarn build
 yarn start
 ```
+
+Alternatively, supply env vars via your MCP client's `env:` block (see
+[Connecting an MCP client](#connecting-an-mcp-client)) — no separate shell
+export step needed in that case.
+
+> If you prefer a file-based approach, copy `.env.example` to `.env`, fill in
+> your values, and launch with `node --env-file=.env dist/main.js` (or let
+> docker-compose auto-load it for `${VAR}` substitution).
 
 By default, `yarn start` runs the server over **stdio**: no port is opened
 and the process is designed to be spawned as a child by an MCP client. Set
@@ -74,9 +84,11 @@ startup errors.
 
 ## Configuration
 
-All configuration is read from environment variables. In local
-development they typically come from a project-local `.env` file (which
-is gitignored — never commit it).
+All configuration is read from `process.env`. Set vars however your runtime
+or orchestrator supports — shell exports, MCP client `env:` config blocks,
+`docker run -e`, k8s Secrets, Compose `environment:`, etc. `.env.example`
+lists every recognized var as a reference; see [Auth](#auth) for selection
+priority.
 
 ### Required variables
 
@@ -92,27 +104,31 @@ is gitignored — never commit it).
 
 See [Auth](#auth) below for the full selection priority.
 
+The examples below show shell-export form. The same key-value pairs work
+identically via any delivery mechanism (MCP client `env:` block,
+`docker run -e`, k8s Secret, docker-compose `environment:`, etc.).
+
 ### Example — OAuth client_credentials
 
-```dotenv
-SNOW_INSTANCE_URL=https://your-instance.service-now.com
-SNOW_OAUTH_CLIENT_ID=abc123
-SNOW_OAUTH_CLIENT_SECRET=replace-me
+```bash
+export SNOW_INSTANCE_URL=https://your-instance.service-now.com
+export SNOW_OAUTH_CLIENT_ID=abc123
+export SNOW_OAUTH_CLIENT_SECRET=replace-me
 ```
 
 ### Example — OAuth bearer
 
-```dotenv
-SNOW_INSTANCE_URL=https://your-instance.service-now.com
-SNOW_OAUTH_TOKEN=eyJraWQiOiI...
+```bash
+export SNOW_INSTANCE_URL=https://your-instance.service-now.com
+export SNOW_OAUTH_TOKEN=eyJraWQiOiI...
 ```
 
 ### Example — HTTP Basic
 
-```dotenv
-SNOW_INSTANCE_URL=https://your-instance.service-now.com
-SNOW_USER=integration.user
-SNOW_PASSWORD=replace-me
+```bash
+export SNOW_INSTANCE_URL=https://your-instance.service-now.com
+export SNOW_USER=integration.user
+export SNOW_PASSWORD=replace-me
 ```
 
 ### Startup validation
@@ -237,7 +253,8 @@ Desktop docs). Same shape:
 
 Use the same `command` + `args` + `env` triplet. The server reads
 credentials only from `process.env`; pass them via the client's `env`
-block or via a sourced `.env`.
+block, shell exports, or any other runtime mechanism that populates the
+process environment.
 
 ### Verifying
 
@@ -439,24 +456,35 @@ docker build -t snow-mcp:local .
 
 The container defaults to the Streamable HTTP transport on port
 `17880` and binds `0.0.0.0` inside the container. Pass credentials
-via `--env-file` and map the port to the host:
+via `-e` flags (or forwarded from your shell env) and map the port:
 
 ```bash
 docker run --rm \
-  --env-file .env \
+  -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
+  -e SNOW_USER=integration.user \
+  -e SNOW_PASSWORD=replace-me \
   -p 17880:17880 \
   snow-mcp:local
+```
+
+If you prefer a file, `--env-file .env` is an equivalent alternative:
+
+```bash
+docker run --rm --env-file .env -p 17880:17880 snow-mcp:local
 ```
 
 ### Compose
 
 ```bash
+# Export credentials in your shell first, then:
 docker compose up --build
 ```
 
-The provided `docker-compose.yml` reads ServiceNow credentials from
-`.env` and forces `MCP_TRANSPORT=http`, `MCP_HTTP_HOST=0.0.0.0`,
-`MCP_HTTP_PORT=17880`.
+The provided `docker-compose.yml` substitutes `${VAR}` from your shell
+environment and forces `MCP_TRANSPORT=http`, `MCP_HTTP_HOST=0.0.0.0`,
+`MCP_HTTP_PORT=17880`. If you prefer a file, compose also auto-loads
+`.env` from the project directory for `${VAR}` substitution — no flag
+needed; just have a `.env` present.
 
 ### Use a different port
 
@@ -465,7 +493,9 @@ Override both the env var and the published port together:
 
 ```bash
 docker run --rm \
-  --env-file .env \
+  -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
+  -e SNOW_USER=integration.user \
+  -e SNOW_PASSWORD=replace-me \
   -e MCP_HTTP_PORT=8443 \
   -p 8443:8443 \
   snow-mcp:local
@@ -506,7 +536,8 @@ Rules (see `.claude/rules/testing.md`):
   endpoints — open a discussion instead.
 - **HTTPS only.** Non-`https://` instance URLs are rejected at startup.
 - **Secrets hygiene.**
-  - `.env` is gitignored.
+  - Never commit files containing live secret values (`.env`, credential
+    dumps, etc.). `.env` is gitignored as a safeguard.
   - `Authorization`, cookies, and `SNOW_*` values are redacted before
     any log line.
   - Errors crossing the MCP boundary have ServiceNow stack traces,
@@ -528,7 +559,7 @@ for the project's full security and error-handling rules.
 
 | Symptom                                                 | Likely cause / fix                                                                                                   |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `Missing required configuration: SNOW_INSTANCE_URL`     | `.env` not loaded, or the variable is empty. Confirm the file path and that the client passes `env`.                 |
+| `Missing required configuration: SNOW_INSTANCE_URL`     | Env var not set or empty. Confirm your shell exports, MCP client `env:` block, or `-e` flag includes the var.        |
 | `SNOW_INSTANCE_URL must use https://`                   | The server refuses non-HTTPS instances. Use the full `https://...` URL.                                              |
 | `401` / `ServiceNowAuthError` from tool calls           | Bearer token expired or user/password incorrect. Rotate the credential.                                              |
 | `404` / `ServiceNowNotFoundError` from `describe_table` | Table name misspelled, or the user lacks read ACL on `sys_db_object` for it.                                         |
@@ -567,8 +598,8 @@ snow-mcp/
 ├── USAGE.md                  # connection + tool quick reference
 ├── .claude/
 │   └── rules/                # code-quality, testing, security, error-handling
-├── .env                      # local credentials (gitignored)
-├── .env.example              # committed template of every env var
+├── .env                      # optional local secrets file (gitignored)
+├── .env.example              # reference list of every recognized env var
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts

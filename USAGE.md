@@ -7,7 +7,7 @@ Streamable HTTP).
 This document covers:
 
 1. Prerequisites
-2. Configuration (`.env`)
+2. Configuration
 3. Building & running
 4. Wiring the server into an MCP client
 5. Tool reference
@@ -32,16 +32,17 @@ The authenticated user only needs read access; the server never issues
 
 ## 2. Configuration
 
-Configuration is read from environment variables (typically a project-local
-`.env` file). `.env` is gitignored — do not commit it.
+Configuration is read from `process.env`. Provide env vars however your
+runtime or orchestrator supports — shell exports, MCP client `env:` config
+blocks, `docker run -e`, k8s Secrets, Compose `environment:`, etc.
+`.env.example` lists every recognized var as a reference.
 
-Create `.env` in the repo root with **one** of three auth forms.
-Selection is implicit by which vars are set. **Priority:**
-`client_credentials > static bearer > basic`.
+Set **one** of three auth forms. Selection is implicit by which vars are set.
+**Priority:** `client_credentials > static bearer > basic`.
 
 ### Option A — OAuth client_credentials (recommended for server-to-server)
 
-```dotenv
+```
 SNOW_INSTANCE_URL=https://your-instance.service-now.com
 SNOW_OAUTH_CLIENT_ID=abc123
 SNOW_OAUTH_CLIENT_SECRET=replace-me
@@ -54,18 +55,26 @@ API).
 
 ### Option B — OAuth bearer token
 
-```dotenv
+```
 SNOW_INSTANCE_URL=https://your-instance.service-now.com
 SNOW_OAUTH_TOKEN=eyJraWQiOiI...
 ```
 
 ### Option C — Basic auth
 
-```dotenv
+```
 SNOW_INSTANCE_URL=https://your-instance.service-now.com
 SNOW_USER=integration.user
 SNOW_PASSWORD=replace-me
 ```
+
+### How to provide env vars
+
+- **Shell:** `export SNOW_INSTANCE_URL=... && export SNOW_USER=... && yarn start`
+- **MCP client `env:` config (Claude Code, Claude Desktop, Cursor):** populate the `env` dict in the server entry (see §4); values are forwarded to the spawned process.
+- **Docker:** `docker run -e SNOW_INSTANCE_URL=... -e SNOW_USER=... -e SNOW_PASSWORD=... snow-mcp:local`
+- **docker-compose:** an `environment:` block with `${VAR}` substitution (compose interpolates from your shell, and also auto-loads `.env` from the project dir _into the interpolation scope_ — not into the container directly), or `env_file:` which injects a file's vars straight into the container's environment
+- **`.env` file + node:** `node --env-file=.env dist/main.js` if you prefer a file-based approach
 
 Rules enforced at startup (`src/config.ts`):
 
@@ -160,6 +169,10 @@ Most MCP clients spawn the server over stdio; some (e.g. claude.ai web
 or self-hosted gateways) connect to a Streamable HTTP endpoint. Both
 work — examples below cover the stdio pattern.
 
+The `env: {}` block in MCP client configs is one of the supported env-var
+delivery patterns — the same vars described in §2 apply regardless of
+whether they come from an `env:` block, shell exports, or another source.
+
 ### Claude Code (CLI)
 
 Add an entry under `mcpServers` in your Claude Code config
@@ -210,8 +223,9 @@ Desktop docs). Same shape as above:
 ### Cursor / other stdio MCP clients
 
 Use the same `command` + `args` + `env` triplet. The server reads
-credentials only from `process.env`, so passing them through the client's
-`env` block (or via a sourced `.env`) both work.
+credentials only from `process.env`; pass them via the client's `env`
+block, shell exports, or any other mechanism that populates the process
+environment.
 
 ### Verifying the connection
 
@@ -222,9 +236,21 @@ see eight tools under `snow-mcp` (see §5) and one resource
 ### Running in Docker
 
 The repo ships a multi-stage Dockerfile with a distroless runtime
-stage. See the [Docker](README.md#docker) section in the README for
-build/run commands. The container defaults to the HTTP transport on
-port `17880`.
+stage. The container defaults to the HTTP transport on port `17880`.
+Pass credentials via `-e` flags:
+
+```bash
+docker build -t snow-mcp:local .
+docker run --rm \
+  -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
+  -e SNOW_USER=integration.user \
+  -e SNOW_PASSWORD=replace-me \
+  -p 17880:17880 \
+  snow-mcp:local
+```
+
+See the [Docker](README.md#docker) section in the README for compose and
+port-override examples.
 
 ---
 
@@ -340,7 +366,7 @@ discovery without paying for repeated `list_tables` calls.
 
 | Symptom                                             | Likely cause / fix                                                                                                          |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `Missing required configuration: SNOW_INSTANCE_URL` | `.env` not loaded, or the variable is empty. Confirm the file path and that the MCP client passes `env`.                    |
+| `Missing required configuration: SNOW_INSTANCE_URL` | Env var not set or empty. Confirm your shell exports, MCP client `env:` block, or `-e` flag includes the var.               |
 | `SNOW_INSTANCE_URL must use https://`               | The server refuses non-HTTPS instances. Use the full `https://...` URL.                                                     |
 | `401` / authentication errors from tool calls       | Bearer token expired or user/password incorrect. Rotate the credential.                                                     |
 | `404 table not found` from `describe_table`         | Table name is misspelled or the user lacks read ACL on `sys_db_object` for it.                                              |
@@ -377,7 +403,8 @@ yarn test src/servicenow
 
 - This server is **read-only by design**. Do not patch in mutation
   endpoints; raise a discussion first.
-- Credentials live in `.env` only. Never paste them into chat, never log
-  them, never include them in error messages.
+- Credentials live in `process.env`. Never paste them into chat, never
+  log them, never include them in error messages, and never commit files
+  containing live secret values.
 - Validate any client-provided table names, queries, and field lists
   before forwarding to ServiceNow.
