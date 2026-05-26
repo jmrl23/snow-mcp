@@ -31,6 +31,8 @@ export function createServiceNowClient(
     aggregate: createAggregateApi(http),
     attachment: createAttachmentApi(http),
     report: createReportApi(table),
-    userContext: createUserContextApi(table),
+    userContext: createUserContextApi(table, {
+      authenticatedUserName: config.authenticatedUserName,
+    }),
   };
 }

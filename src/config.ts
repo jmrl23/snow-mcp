@@ -19,6 +19,14 @@ export interface ServerConfig {
   auth: AuthConfig;
   cache: CacheConfig;
   transport: TransportConfig;
+  /**
+   * user_name of the ServiceNow user this process authenticates as.
+   * Used by `get_user_context` to avoid the `javascript:gs.getUser().getName()`
+   * lookup, which requires elevated script privileges and returns a phantom
+   * empty row otherwise. Sourced from SNOW_AUTHENTICATED_USER if set, else
+   * from SNOW_USER when basic auth is in use.
+   */
+  authenticatedUserName?: string;
 }
 
 const REQUIRED_AUTH_HINT =
@@ -82,7 +90,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   }
   const transport: TransportConfig = { kind: transportKind, host: httpHost, port: httpPort };
 
-  return { instanceUrl, auth, cache, transport };
+  const explicitUser = env.SNOW_AUTHENTICATED_USER?.trim();
+  const authenticatedUserName = explicitUser || (auth.kind === 'basic' ? auth.user : undefined);
+
+  return { instanceUrl, auth, cache, transport, authenticatedUserName };
 }
 
 function parseIntEnv(

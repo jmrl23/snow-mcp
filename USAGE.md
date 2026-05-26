@@ -107,6 +107,21 @@ is configured appropriately.
 After a schema customization in ServiceNow, restart the server or wait
 for the TTL to expire.
 
+### Identity resolution
+
+`get_user_context` resolves the calling user against `sys_user`. The
+default lookup uses `user_name=javascript:gs.getUser().getName()`, which
+only resolves for accounts holding the `client_callable_script_include`
+privilege. Without it the lookup returns a phantom empty row; the tool
+now throws a `ConfigError` rather than masking that as success.
+
+| Variable                  | Default                            | Notes                                                                   |
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| `SNOW_AUTHENTICATED_USER` | `SNOW_USER` when basic auth is set | Filters `sys_user` by this `user_name` directly; skips the script eval. |
+
+Set `SNOW_AUTHENTICATED_USER` explicitly when using OAuth bearer or
+client_credentials, or when the basic-auth user lacks script-eval rights.
+
 ---
 
 ## 3. Building & running

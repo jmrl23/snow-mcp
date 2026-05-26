@@ -80,14 +80,15 @@ is gitignored — never commit it).
 
 ### Required variables
 
-| Variable                   | Required                             | Description                                                  |
-| -------------------------- | ------------------------------------ | ------------------------------------------------------------ |
-| `SNOW_INSTANCE_URL`        | always                               | Must start with `https://`. Trailing slashes are stripped.   |
-| `SNOW_OAUTH_CLIENT_ID`     | with `SNOW_OAUTH_CLIENT_SECRET`      | OAuth client_credentials client id. Highest auth priority.   |
-| `SNOW_OAUTH_CLIENT_SECRET` | with `SNOW_OAUTH_CLIENT_ID`          | OAuth client_credentials secret. Must be paired with the id. |
-| `SNOW_OAUTH_TOKEN`         | one of: cc pair, token, or user+pass | Static bearer token. Used if no client_credentials pair.     |
-| `SNOW_USER`                | required if no cc pair and no token  | ServiceNow user for HTTP Basic auth.                         |
-| `SNOW_PASSWORD`            | required if no cc pair and no token  | Password for HTTP Basic auth.                                |
+| Variable                   | Required                             | Description                                                                                         |
+| -------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `SNOW_INSTANCE_URL`        | always                               | Must start with `https://`. Trailing slashes are stripped.                                          |
+| `SNOW_OAUTH_CLIENT_ID`     | with `SNOW_OAUTH_CLIENT_SECRET`      | OAuth client_credentials client id. Highest auth priority.                                          |
+| `SNOW_OAUTH_CLIENT_SECRET` | with `SNOW_OAUTH_CLIENT_ID`          | OAuth client_credentials secret. Must be paired with the id.                                        |
+| `SNOW_OAUTH_TOKEN`         | one of: cc pair, token, or user+pass | Static bearer token. Used if no client_credentials pair.                                            |
+| `SNOW_USER`                | required if no cc pair and no token  | ServiceNow user for HTTP Basic auth.                                                                |
+| `SNOW_PASSWORD`            | required if no cc pair and no token  | Password for HTTP Basic auth.                                                                       |
+| `SNOW_AUTHENTICATED_USER`  | optional                             | Override for `get_user_context`'s sys_user lookup. See [Identity resolution](#identity-resolution). |
 
 See [Auth](#auth) below for the full selection priority.
 
@@ -159,6 +160,20 @@ The HTTP transport binds to localhost by default. To expose it to other machines
 | `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries per tool.        |
 
 After a schema customization in ServiceNow, restart the server or wait for the TTL to expire.
+
+### Identity resolution
+
+`get_user_context` resolves the calling user against `sys_user`. By default the lookup uses `user_name=javascript:gs.getUser().getName()`, which only resolves correctly for accounts holding the `client_callable_script_include` privilege. Accounts without it get a phantom row back (empty `user_name`/`name`/`email`) — the tool now throws a `ConfigError` in that case instead of returning the empty row.
+
+| Variable                  | Default                            | Notes                                                               |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------- |
+| `SNOW_AUTHENTICATED_USER` | `SNOW_USER` when basic auth is set | Filters `sys_user` by this `user_name` directly; skips script eval. |
+
+Set `SNOW_AUTHENTICATED_USER` explicitly when:
+
+- Using `SNOW_OAUTH_TOKEN` or OAuth client_credentials and you want `get_user_context` to resolve a real user.
+- Using basic auth as a different user than `SNOW_USER`.
+- Basic auth user lacks script-eval rights (rare; usually basic auth users have them).
 
 ---
 
