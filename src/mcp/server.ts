@@ -16,7 +16,13 @@ export function createMcpServer(client: ServiceNowClient): McpServer {
   const server = new McpServer({ name: 'snow-mcp', version: '1.0.0' });
 
   for (const tool of [
-    createListTablesTool(client),
+    createListTablesTool(
+      client,
+      createSchemaCache<{ name: string; label: string; super_class?: string }[]>({
+        ttlMs: 0,
+        maxEntries: 0,
+      }),
+    ),
     createDescribeTableTool(client, createSchemaCache({ ttlMs: 0, maxEntries: 0 })),
     createQueryTableTool(client),
     createGetRecordTool(client),
