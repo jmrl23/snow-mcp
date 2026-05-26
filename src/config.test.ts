@@ -16,6 +16,8 @@ describe('loadConfig', () => {
     })();
     expect(err).toBeInstanceOf(ConfigError);
     expect((err as Error).message).toContain('SNOW_INSTANCE_URL');
+    expect((err as Error).message).toContain('SNOW_OAUTH_CLIENT_ID');
+    expect((err as Error).message).toContain('SNOW_OAUTH_CLIENT_SECRET');
     expect((err as Error).message).toContain('SNOW_OAUTH_TOKEN');
     expect((err as Error).message).toContain('SNOW_USER');
     expect((err as Error).message).toContain('SNOW_PASSWORD');
@@ -90,5 +92,42 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_MAX_ENTRIES: '0' }),
     ).toThrow(/SCHEMA_CACHE_MAX_ENTRIES/);
+  });
+
+  it('selects oauth_client_credentials when SNOW_OAUTH_CLIENT_ID and SNOW_OAUTH_CLIENT_SECRET are set', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_CLIENT_ID: 'id',
+      SNOW_OAUTH_CLIENT_SECRET: 'sec',
+    });
+    expect(cfg.auth).toEqual({
+      kind: 'oauth_client_credentials',
+      clientId: 'id',
+      clientSecret: 'sec',
+    });
+  });
+
+  it('prefers oauth_client_credentials over bearer token when both are set', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_CLIENT_ID: 'id',
+      SNOW_OAUTH_CLIENT_SECRET: 'sec',
+      SNOW_OAUTH_TOKEN: 'abc',
+      SNOW_USER: 'u',
+      SNOW_PASSWORD: 'p',
+    });
+    expect(cfg.auth.kind).toBe('oauth_client_credentials');
+  });
+
+  it('rejects partial OAuth client_credentials (only CLIENT_ID)', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_CLIENT_ID: 'id' })).toThrow(
+      /SNOW_OAUTH_CLIENT_SECRET/,
+    );
+  });
+
+  it('rejects partial OAuth client_credentials (only CLIENT_SECRET)', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_CLIENT_SECRET: 'sec' })).toThrow(
+      /SNOW_OAUTH_CLIENT_ID/,
+    );
   });
 });

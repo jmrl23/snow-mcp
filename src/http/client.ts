@@ -50,7 +50,11 @@ export function createHttpClient(
 
 function buildAuthHeader(auth: AuthConfig): string {
   if (auth.kind === 'bearer') return `Bearer ${auth.token}`;
-  return `Basic ${Buffer.from(`${auth.user}:${auth.password}`).toString('base64')}`;
+  if (auth.kind === 'basic')
+    return `Basic ${Buffer.from(`${auth.user}:${auth.password}`).toString('base64')}`;
+  // NOTE: oauth_client_credentials requires a live token fetch; callers must
+  // migrate to AuthProvider before relying on this code path (Task 16).
+  throw new Error('oauth_client_credentials auth must be handled via AuthProvider');
 }
 
 const REDACTED = '[REDACTED]';
