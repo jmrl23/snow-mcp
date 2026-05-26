@@ -106,11 +106,34 @@ SNOW_PASSWORD=replace-me
 
 - `SNOW_INSTANCE_URL` is present and starts with `https://`.
 - The URL parses as a valid URL.
-- Either `SNOW_OAUTH_TOKEN` **or** both `SNOW_USER` + `SNOW_PASSWORD` are
+- Either `SNOW_OAUTH_CLIENT_ID` + `SNOW_OAUTH_CLIENT_SECRET`, **or**
+  `SNOW_OAUTH_TOKEN`, **or** both `SNOW_USER` + `SNOW_PASSWORD` are
   provided.
 
 Failures throw a `ConfigError` and the process exits non-zero — secrets
 are **never** echoed in the error message.
+
+### Auth
+
+snow-mcp picks an auth strategy from the env. Priority: client_credentials > static token > basic.
+
+| Vars                                                | Strategy                 |
+| --------------------------------------------------- | ------------------------ |
+| `SNOW_OAUTH_CLIENT_ID` + `SNOW_OAUTH_CLIENT_SECRET` | OAuth client_credentials |
+| `SNOW_OAUTH_TOKEN`                                  | Static bearer token      |
+| `SNOW_USER` + `SNOW_PASSWORD`                       | HTTP Basic               |
+
+OAuth client_credentials fetches a token from `${SNOW_INSTANCE_URL}/oauth_token.do`, caches it until 30s before expiry, and refreshes automatically (also on a 401 from the ServiceNow API).
+
+### Transport
+
+| Variable        | Default     | Notes                                |
+| --------------- | ----------- | ------------------------------------ |
+| `MCP_TRANSPORT` | `stdio`     | Set to `http` for Streamable HTTP.   |
+| `MCP_HTTP_HOST` | `127.0.0.1` | Only used when `MCP_TRANSPORT=http`. |
+| `MCP_HTTP_PORT` | `3000`      | Only used when `MCP_TRANSPORT=http`. |
+
+The HTTP transport binds to localhost by default. To expose it to other machines, set `MCP_HTTP_HOST=0.0.0.0` and ensure your network/firewall is configured appropriately.
 
 ### Schema cache
 
