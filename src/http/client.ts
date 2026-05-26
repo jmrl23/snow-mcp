@@ -1,5 +1,6 @@
 import { ReadOnlyViolationError } from '../errors.js';
-import type { AuthConfig, ServerConfig } from '../config.js';
+import type { ServerConfig } from '../config.js';
+import { createAuthProvider, type AuthProvider } from '../servicenow/auth/index.js';
 
 export interface RequestOptions {
   query?: Record<string, string | undefined>;
@@ -17,16 +18,13 @@ const ALLOWED_METHOD = 'GET';
 export function createHttpClient(
   config: ServerConfig,
   fetchImpl: typeof fetch = fetch,
+  authProvider: AuthProvider = createAuthProvider(config.auth, config.instanceUrl, fetchImpl),
 ): HttpClient {
-  const authHeader = buildAuthHeader(config.auth);
-
   async function requestRaw(
     method: 'GET',
     path: string,
     opts: RequestOptions = {},
   ): Promise<Response> {
-    // Cast forces TS to keep the runtime check even though `method` is typed `'GET'`.
-    // Callers may bypass the type via `as`, and this guard catches them.
     if ((method as string) !== ALLOWED_METHOD) {
       throw new ReadOnlyViolationError(method);
     }
@@ -36,10 +34,18 @@ export function createHttpClient(
         if (v !== undefined) url.searchParams.set(k, v);
       }
     }
-    const headers = new Headers(opts.headers);
-    headers.set('Authorization', authHeader);
-    headers.set('Accept', 'application/json');
-    return fetchImpl(url.toString(), { method, headers, signal: opts.signal });
+
+    const send = async () => {
+      const headers = new Headers(opts.headers);
+      headers.set('Authorization', await authProvider.getAuthHeader());
+      headers.set('Accept', 'application/json');
+      return fetchImpl(url.toString(), { method, headers, signal: opts.signal });
+    };
+
+    const first = await send();
+    if (first.status !== 401) return first;
+    await authProvider.onUnauthorized();
+    return send();
   }
 
   return {
@@ -48,16 +54,12 @@ export function createHttpClient(
   };
 }
 
-function buildAuthHeader(auth: AuthConfig): string {
-  if (auth.kind === 'bearer') return `Bearer ${auth.token}`;
-  return `Basic ${Buffer.from(`${auth.user}:${auth.password}`).toString('base64')}`;
-}
-
 const REDACTED = '[REDACTED]';
 const SECRET_KEY_PATTERNS = [
   /^authorization$/i,
   /^snow_password$/i,
   /^snow_oauth_token$/i,
+  /^snow_oauth_client_secret$/i,
   /password/i,
   /token/i,
   /secret/i,

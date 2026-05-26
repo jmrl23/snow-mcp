@@ -2,20 +2,27 @@ import { ConfigError } from './errors.js';
 
 export type AuthConfig =
   | { kind: 'bearer'; token: string }
-  | { kind: 'basic'; user: string; password: string };
+  | { kind: 'basic'; user: string; password: string }
+  | { kind: 'oauth_client_credentials'; clientId: string; clientSecret: string };
 
 export interface CacheConfig {
   ttlMs: number;
   maxEntries: number;
 }
 
+export type TransportConfig =
+  | { kind: 'stdio'; host: string; port: number }
+  | { kind: 'http'; host: string; port: number };
+
 export interface ServerConfig {
   instanceUrl: string;
   auth: AuthConfig;
   cache: CacheConfig;
+  transport: TransportConfig;
 }
 
-const REQUIRED_AUTH_HINT = 'either SNOW_OAUTH_TOKEN, or both SNOW_USER and SNOW_PASSWORD';
+const REQUIRED_AUTH_HINT =
+  'SNOW_OAUTH_CLIENT_ID+SNOW_OAUTH_CLIENT_SECRET, SNOW_OAUTH_TOKEN, or SNOW_USER+SNOW_PASSWORD';
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const missing: string[] = [];
@@ -23,16 +30,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const rawUrl = env.SNOW_INSTANCE_URL?.trim();
   if (!rawUrl) missing.push('SNOW_INSTANCE_URL');
 
+  const clientId = env.SNOW_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.SNOW_OAUTH_CLIENT_SECRET?.trim();
   const token = env.SNOW_OAUTH_TOKEN?.trim();
   const user = env.SNOW_USER?.trim();
   const password = env.SNOW_PASSWORD;
+
+  if ((clientId && !clientSecret) || (!clientId && clientSecret)) {
+    throw new ConfigError('SNOW_OAUTH_CLIENT_ID and SNOW_OAUTH_CLIENT_SECRET must be set together');
+  }
+
   let auth: AuthConfig | undefined;
-  if (token) {
+  if (clientId && clientSecret) {
+    auth = { kind: 'oauth_client_credentials', clientId, clientSecret };
+  } else if (token) {
     auth = { kind: 'bearer', token };
   } else if (user && password) {
     auth = { kind: 'basic', user, password };
   } else {
-    missing.push(`SNOW_OAUTH_TOKEN`, `SNOW_USER`, `SNOW_PASSWORD (${REQUIRED_AUTH_HINT})`);
+    missing.push(`auth (${REQUIRED_AUTH_HINT})`);
   }
 
   if (missing.length > 0 || !rawUrl || !auth) {
@@ -55,7 +71,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     maxEntries: parseIntEnv(env, 'SCHEMA_CACHE_MAX_ENTRIES', 256, { min: 1 }),
   };
 
-  return { instanceUrl, auth, cache };
+  const transportKind = (env.MCP_TRANSPORT?.trim() || 'stdio') as string;
+  if (transportKind !== 'stdio' && transportKind !== 'http') {
+    throw new ConfigError(`MCP_TRANSPORT must be "stdio" or "http" (got: ${transportKind})`);
+  }
+  const httpHost = env.MCP_HTTP_HOST?.trim() || '127.0.0.1';
+  const httpPort = parseIntEnv(env, 'MCP_HTTP_PORT', 3000, { min: 1 });
+  if (httpPort > 65535) {
+    throw new ConfigError(`MCP_HTTP_PORT must be <= 65535 (got: ${httpPort})`);
+  }
+  const transport: TransportConfig = { kind: transportKind, host: httpHost, port: httpPort };
+
+  return { instanceUrl, auth, cache, transport };
 }
 
 function parseIntEnv(

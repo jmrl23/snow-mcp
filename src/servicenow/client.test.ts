@@ -6,6 +6,7 @@ const cfg: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'bearer', token: 't' },
   cache: { ttlMs: 0, maxEntries: 0 },
+  transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
 };
 
 describe('createServiceNowClient', () => {

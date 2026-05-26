@@ -7,11 +7,13 @@ const cfgBasic: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'basic', user: 'u', password: 'p' },
   cache: { ttlMs: 0, maxEntries: 0 },
+  transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
 };
 const cfgBearer: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'bearer', token: 'abc' },
   cache: { ttlMs: 0, maxEntries: 0 },
+  transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
 };
 
 function fakeFetch(): {
@@ -97,5 +99,48 @@ describe('createHttpClient', () => {
     expect(s).not.toContain('Basic xxx');
     expect(s).toContain('visible');
     expect(s).toContain('url');
+  });
+});
+
+function fakeFetchSequence(responses: Response[]): {
+  fn: typeof fetch;
+  calls: { url: string; init: RequestInit | undefined }[];
+} {
+  const calls: { url: string; init: RequestInit | undefined }[] = [];
+  let idx = 0;
+  const fn = (async (url: string | URL, init?: RequestInit) => {
+    calls.push({ url: String(url), init });
+    const res = responses[Math.min(idx, responses.length - 1)];
+    idx += 1;
+    return res as Response;
+  }) as typeof fetch;
+  return { fn, calls };
+}
+
+describe('createHttpClient — 401 retry', () => {
+  it('retries the request exactly once after a 401 and surfaces the second response', async () => {
+    const { fn, calls } = fakeFetchSequence([
+      new Response('{}', { status: 401 }),
+      new Response('{"result":[]}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    ]);
+    const client = createHttpClient(cfgBasic, fn);
+    const res = await client.request('/api/now/table/incident');
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does not retry more than once on persistent 401', async () => {
+    const { fn, calls } = fakeFetchSequence([
+      new Response('{}', { status: 401 }),
+      new Response('{}', { status: 401 }),
+      new Response('{}', { status: 401 }),
+    ]);
+    const client = createHttpClient(cfgBasic, fn);
+    const res = await client.request('/api/now/table/incident');
+    expect(res.status).toBe(401);
+    expect(calls).toHaveLength(2);
   });
 });

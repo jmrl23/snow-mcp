@@ -16,6 +16,8 @@ describe('loadConfig', () => {
     })();
     expect(err).toBeInstanceOf(ConfigError);
     expect((err as Error).message).toContain('SNOW_INSTANCE_URL');
+    expect((err as Error).message).toContain('SNOW_OAUTH_CLIENT_ID');
+    expect((err as Error).message).toContain('SNOW_OAUTH_CLIENT_SECRET');
     expect((err as Error).message).toContain('SNOW_OAUTH_TOKEN');
     expect((err as Error).message).toContain('SNOW_USER');
     expect((err as Error).message).toContain('SNOW_PASSWORD');
@@ -90,5 +92,81 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_MAX_ENTRIES: '0' }),
     ).toThrow(/SCHEMA_CACHE_MAX_ENTRIES/);
+  });
+
+  it('selects oauth_client_credentials when SNOW_OAUTH_CLIENT_ID and SNOW_OAUTH_CLIENT_SECRET are set', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_CLIENT_ID: 'id',
+      SNOW_OAUTH_CLIENT_SECRET: 'sec',
+    });
+    expect(cfg.auth).toEqual({
+      kind: 'oauth_client_credentials',
+      clientId: 'id',
+      clientSecret: 'sec',
+    });
+  });
+
+  it('prefers oauth_client_credentials over bearer token when both are set', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_CLIENT_ID: 'id',
+      SNOW_OAUTH_CLIENT_SECRET: 'sec',
+      SNOW_OAUTH_TOKEN: 'abc',
+      SNOW_USER: 'u',
+      SNOW_PASSWORD: 'p',
+    });
+    expect(cfg.auth.kind).toBe('oauth_client_credentials');
+  });
+
+  it('rejects partial OAuth client_credentials (only CLIENT_ID)', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_CLIENT_ID: 'id' })).toThrow(
+      /SNOW_OAUTH_CLIENT_SECRET/,
+    );
+  });
+
+  it('rejects partial OAuth client_credentials (only CLIENT_SECRET)', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_CLIENT_SECRET: 'sec' })).toThrow(
+      /SNOW_OAUTH_CLIENT_ID/,
+    );
+  });
+
+  it('defaults transport to stdio on 127.0.0.1:3000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.transport).toEqual({ kind: 'stdio', host: '127.0.0.1', port: 3000 });
+  });
+
+  it('parses MCP_TRANSPORT=http with default host and port', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http' });
+    expect(cfg.transport).toEqual({ kind: 'http', host: '127.0.0.1', port: 3000 });
+  });
+
+  it('parses MCP_HTTP_PORT and MCP_HTTP_HOST', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_TOKEN: 't',
+      MCP_TRANSPORT: 'http',
+      MCP_HTTP_PORT: '8080',
+      MCP_HTTP_HOST: '0.0.0.0',
+    });
+    expect(cfg.transport).toEqual({ kind: 'http', host: '0.0.0.0', port: 8080 });
+  });
+
+  it('rejects MCP_TRANSPORT values other than stdio or http', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'ws' })).toThrow(
+      /MCP_TRANSPORT/,
+    );
+  });
+
+  it('rejects MCP_HTTP_PORT below 1', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '0' }),
+    ).toThrow(/MCP_HTTP_PORT/);
+  });
+
+  it('rejects MCP_HTTP_PORT above 65535', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '70000' }),
+    ).toThrow(/MCP_HTTP_PORT/);
   });
 });

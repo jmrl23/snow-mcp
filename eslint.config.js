@@ -22,7 +22,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/http/client.ts'],
+    files: [
+      'src/http/client.ts',
+      'src/servicenow/auth/oauth-client-credentials-provider.ts',
+      'src/servicenow/auth/index.ts',
+      'src/mcp/transport/http.test.ts',
+    ],
     rules: { 'no-restricted-globals': 'off' },
   },
   prettier,
