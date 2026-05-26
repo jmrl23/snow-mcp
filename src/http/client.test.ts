@@ -7,11 +7,13 @@ const cfgBasic: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'basic', user: 'u', password: 'p' },
   cache: { ttlMs: 0, maxEntries: 0 },
+  transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
 };
 const cfgBearer: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'bearer', token: 'abc' },
   cache: { ttlMs: 0, maxEntries: 0 },
+  transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
 };
 
 function fakeFetch(): {

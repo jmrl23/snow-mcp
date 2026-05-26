@@ -10,10 +10,15 @@ export interface CacheConfig {
   maxEntries: number;
 }
 
+export type TransportConfig =
+  | { kind: 'stdio'; host: string; port: number }
+  | { kind: 'http'; host: string; port: number };
+
 export interface ServerConfig {
   instanceUrl: string;
   auth: AuthConfig;
   cache: CacheConfig;
+  transport: TransportConfig;
 }
 
 const REQUIRED_AUTH_HINT =
@@ -66,7 +71,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     maxEntries: parseIntEnv(env, 'SCHEMA_CACHE_MAX_ENTRIES', 256, { min: 1 }),
   };
 
-  return { instanceUrl, auth, cache };
+  const transportKind = (env.MCP_TRANSPORT?.trim() || 'stdio') as string;
+  if (transportKind !== 'stdio' && transportKind !== 'http') {
+    throw new ConfigError(`MCP_TRANSPORT must be "stdio" or "http" (got: ${transportKind})`);
+  }
+  const httpHost = env.MCP_HTTP_HOST?.trim() || '127.0.0.1';
+  const httpPort = parseIntEnv(env, 'MCP_HTTP_PORT', 3000, { min: 1 });
+  if (httpPort > 65535) {
+    throw new ConfigError(`MCP_HTTP_PORT must be <= 65535 (got: ${httpPort})`);
+  }
+  const transport: TransportConfig = { kind: transportKind, host: httpHost, port: httpPort };
+
+  return { instanceUrl, auth, cache, transport };
 }
 
 function parseIntEnv(

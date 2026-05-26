@@ -130,4 +130,43 @@ describe('loadConfig', () => {
       /SNOW_OAUTH_CLIENT_ID/,
     );
   });
+
+  it('defaults transport to stdio on 127.0.0.1:3000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.transport).toEqual({ kind: 'stdio', host: '127.0.0.1', port: 3000 });
+  });
+
+  it('parses MCP_TRANSPORT=http with default host and port', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http' });
+    expect(cfg.transport).toEqual({ kind: 'http', host: '127.0.0.1', port: 3000 });
+  });
+
+  it('parses MCP_HTTP_PORT and MCP_HTTP_HOST', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_TOKEN: 't',
+      MCP_TRANSPORT: 'http',
+      MCP_HTTP_PORT: '8080',
+      MCP_HTTP_HOST: '0.0.0.0',
+    });
+    expect(cfg.transport).toEqual({ kind: 'http', host: '0.0.0.0', port: 8080 });
+  });
+
+  it('rejects MCP_TRANSPORT values other than stdio or http', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'ws' })).toThrow(
+      /MCP_TRANSPORT/,
+    );
+  });
+
+  it('rejects MCP_HTTP_PORT below 1', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '0' }),
+    ).toThrow(/MCP_HTTP_PORT/);
+  });
+
+  it('rejects MCP_HTTP_PORT above 65535', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '70000' }),
+    ).toThrow(/MCP_HTTP_PORT/);
+  });
 });
