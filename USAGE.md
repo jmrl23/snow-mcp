@@ -35,7 +35,7 @@ The authenticated user only needs read access; the server never issues
 Configuration is read from environment variables (typically a project-local
 `.env` file). `.env` is gitignored — do not commit it.
 
-Create `/home/master/mcp/snow-mcp/.env` with **one** of three auth forms.
+Create `.env` in the repo root with **one** of three auth forms.
 Selection is implicit by which vars are set. **Priority:**
 `client_credentials > static bearer > basic`.
 
@@ -155,7 +155,7 @@ Add an entry under `mcpServers` in your Claude Code config
   "mcpServers": {
     "snow-mcp": {
       "command": "node",
-      "args": ["/home/master/mcp/snow-mcp/dist/main.js"],
+      "args": ["/absolute/path/to/snow-mcp/dist/main.js"],
       "env": {
         "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
         "SNOW_OAUTH_TOKEN": "eyJraWQiOiI..."
