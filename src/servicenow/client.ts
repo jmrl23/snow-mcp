@@ -18,9 +18,9 @@ export interface ServiceNowClient {
 
 export function createServiceNowClient(
   config: ServerConfig,
-  fetchImpl: typeof fetch,
+  fetchImpl?: typeof fetch,
 ): ServiceNowClient {
-  const base = createHttpClient(config, fetchImpl);
+  const base = fetchImpl ? createHttpClient(config, fetchImpl) : createHttpClient(config);
   const http: HttpClient = {
     request: (path: string, opts?: RequestOptions) => withRetry(() => base.request(path, opts)),
     requestRaw: (method, path, opts) => withRetry(() => base.requestRaw(method, path, opts)),
