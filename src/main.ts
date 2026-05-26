@@ -1,19 +1,22 @@
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { loadConfig } from './config.js';
+import { loadConfig, type ServerConfig } from './config.js';
 import { createServiceNowClient } from './servicenow/client.js';
 import { createMcpServer } from './mcp/server.js';
+import { connectTransport } from './mcp/transport/index.js';
 
-export function buildServer(env: NodeJS.ProcessEnv = process.env): McpServer {
+export function buildServer(env: NodeJS.ProcessEnv = process.env): {
+  server: McpServer;
+  config: ServerConfig;
+} {
   const config = loadConfig(env);
   const client = createServiceNowClient(config);
-  return createMcpServer(client, config.cache);
+  const server = createMcpServer(client, config.cache);
+  return { server, config };
 }
 
 async function main(): Promise<void> {
-  const server = buildServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const { server, config } = buildServer();
+  await connectTransport(server, config.transport);
 }
 
 const invokedDirectly = import.meta.url === `file://${process.argv[1]}`;
