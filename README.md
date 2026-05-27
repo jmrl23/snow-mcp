@@ -65,6 +65,20 @@ yarn build
 yarn start
 ```
 
+> **Just want to try it?** A pre-built multi-arch image is published to GHCR
+> on every `main` push — skip the install/build entirely:
+>
+> ```bash
+> docker run --rm \
+>   -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
+>   -e SNOW_USER=integration.user \
+>   -e SNOW_PASSWORD=replace-me \
+>   -p 17880:17880 \
+>   ghcr.io/jmrl23/snow-mcp:latest
+> ```
+>
+> See [Container image (GHCR)](#container-image-ghcr) for tag matrix and platforms.
+
 Alternatively, supply env vars via your MCP client's `env:` block (see
 [Connecting an MCP client](#connecting-an-mcp-client)) — no separate shell
 export step needed in that case.
