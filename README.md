@@ -302,8 +302,9 @@ invocation with all required env vars.
 
 #### Claude Code (CLI)
 
-Add to `~/.claude.json` (user scope) or `.mcp.json` in the project root
-(project scope):
+Add to the same `~/.claude/settings.json` (user scope) or
+`.claude/settings.json` (project scope) used by the stdio example
+above, but with the http-transport shape:
 
 ```json
 {
@@ -326,6 +327,11 @@ use the CLI (which writes the same JSON for you):
 claude mcp add --transport http snow-mcp https://mcp.internal.example.com/mcp \
   --header "Authorization: Bearer replace-with-token-from-openssl"
 ```
+
+Config-file locations have shifted across Claude Code versions
+(`~/.claude.json`, `.mcp.json`); if `~/.claude/settings.json` doesn't
+pick up the entry, check the
+[current Claude Code MCP docs](https://docs.claude.com/en/docs/claude-code/mcp).
 
 #### Claude Desktop
 
