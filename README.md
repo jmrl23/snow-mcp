@@ -172,13 +172,16 @@ OAuth client_credentials fetches a token from `${SNOW_INSTANCE_URL}/oauth_token.
 
 ### Transport
 
-| Variable        | Default     | Notes                                |
-| --------------- | ----------- | ------------------------------------ |
-| `MCP_TRANSPORT` | `stdio`     | Set to `http` for Streamable HTTP.   |
-| `MCP_HTTP_HOST` | `127.0.0.1` | Only used when `MCP_TRANSPORT=http`. |
-| `MCP_HTTP_PORT` | `3000`      | Only used when `MCP_TRANSPORT=http`. |
+| Variable         | Default     | Notes                                                                             |
+| ---------------- | ----------- | --------------------------------------------------------------------------------- |
+| `MCP_TRANSPORT`  | `stdio`     | Set to `http` for Streamable HTTP.                                                |
+| `MCP_HTTP_HOST`  | `127.0.0.1` | Only used when `MCP_TRANSPORT=http`.                                              |
+| `MCP_HTTP_PORT`  | `3000`      | Only used when `MCP_TRANSPORT=http`.                                              |
+| `MCP_AUTH_TOKEN` | _required_  | Shared bearer token. **Required when `MCP_TRANSPORT=http`**; ignored under stdio. |
 
 The HTTP transport binds to localhost by default. To expose it to other machines, set `MCP_HTTP_HOST=0.0.0.0` and ensure your network/firewall is configured appropriately.
+
+When `MCP_TRANSPORT=http`, every request to `/mcp` must include `Authorization: Bearer <MCP_AUTH_TOKEN>`. Missing or wrong tokens get a `401`. The server refuses to start if `MCP_AUTH_TOKEN` is unset or blank under http. Generate a strong value with `openssl rand -base64 32` and treat it like any other secret.
 
 ### Schema cache
 
@@ -510,6 +513,7 @@ docker run --rm \
   -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
   -e SNOW_USER=integration.user \
   -e SNOW_PASSWORD=replace-me \
+  -e MCP_AUTH_TOKEN=replace-with-strong-secret \
   -e MCP_HTTP_PORT=8443 \
   -p 8443:8443 \
   snow-mcp:local
