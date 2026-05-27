@@ -199,6 +199,43 @@ Restart Claude Code. Tools appear under the `mcp__snow-mcp__*` namespace
 > Prefer pinning to `dist/main.js` after `yarn build` for predictable
 > startup. Use `yarn dev` only when iterating on the server itself.
 
+---
+
+**Using the GHCR image instead** — skip the local clone + `yarn build`
+by pointing at the published image:
+
+```json
+{
+  "mcpServers": {
+    "snow-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "SNOW_INSTANCE_URL",
+        "-e",
+        "SNOW_OAUTH_TOKEN",
+        "-e",
+        "MCP_TRANSPORT",
+        "ghcr.io/jmrl23/snow-mcp:main"
+      ],
+      "env": {
+        "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
+        "SNOW_OAUTH_TOKEN": "eyJraWQiOiI...",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+`-i` keeps the container's stdin open for the MCP client's JSON-RPC
+stream. `MCP_TRANSPORT=stdio` overrides the image's default of `http`.
+Forwarding env vars by name (`-e SNOW_OAUTH_TOKEN`, no `=value`) keeps
+secrets out of the args array, which `ps` and journald may log.
+
 ### Claude Desktop
 
 Edit `claude_desktop_config.json` (location depends on OS — see Claude
@@ -220,12 +257,53 @@ Desktop docs). Same shape as above:
 }
 ```
 
+---
+
+**Using the GHCR image instead** — same shape, but `command: docker`
+with `args` forwarding env vars into a container:
+
+```json
+{
+  "mcpServers": {
+    "snow-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "SNOW_INSTANCE_URL",
+        "-e",
+        "SNOW_USER",
+        "-e",
+        "SNOW_PASSWORD",
+        "-e",
+        "MCP_TRANSPORT",
+        "ghcr.io/jmrl23/snow-mcp:main"
+      ],
+      "env": {
+        "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
+        "SNOW_USER": "integration.user",
+        "SNOW_PASSWORD": "replace-me",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+`-i` keeps the container's stdin open. `MCP_TRANSPORT=stdio` is
+required because the image's default transport is `http`.
+
 ### Cursor / other stdio MCP clients
 
 Use the same `command` + `args` + `env` triplet. The server reads
 credentials only from `process.env`; pass them via the client's `env`
 block, shell exports, or any other mechanism that populates the process
 environment.
+
+For the Docker variant, copy the Claude Desktop GHCR JSON above and
+adjust the auth env vars to whichever form your setup uses.
 
 ### Verifying the connection
 
@@ -235,9 +313,32 @@ see eight tools under `snow-mcp` (see §5) and one resource
 
 ### Running in Docker
 
-The repo ships a multi-stage Dockerfile with a distroless runtime
-stage. The container defaults to the HTTP transport on port `17880`.
-Pass credentials via `-e` flags:
+Two paths: pull the pre-built multi-arch image from GHCR (faster, no
+local Node toolchain needed), or build from the included Dockerfile
+(useful if you're hacking on the source).
+
+Either way the container defaults to the HTTP transport on port
+`17880`. Pass credentials via `-e` flags.
+
+#### Pull the pre-built image (recommended)
+
+```bash
+docker run --rm \
+  -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
+  -e SNOW_USER=integration.user \
+  -e SNOW_PASSWORD=replace-me \
+  -p 17880:17880 \
+  ghcr.io/jmrl23/snow-mcp:main
+```
+
+Supports `linux/amd64` and `linux/arm64`. See the README's
+[Container image (GHCR)](README.md#container-image-ghcr) section for
+the full tag matrix (`latest`, `main`, `sha-<short>`, semver patterns).
+
+#### Build locally
+
+Useful when you've modified the source and want a `:local` image
+without pushing anywhere:
 
 ```bash
 docker build -t snow-mcp:local .
@@ -249,8 +350,8 @@ docker run --rm \
   snow-mcp:local
 ```
 
-See the [Docker](README.md#docker) section in the README for compose and
-port-override examples.
+See the [Docker](README.md#docker) section in the README for compose
+and port-override examples.
 
 ---
 
