@@ -217,33 +217,4 @@ describe('loadConfig', () => {
       loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '70000' }),
     ).toThrow(/MCP_HTTP_PORT/);
   });
-
-  it('populates authenticatedUserName from SNOW_USER when basic auth is in use', () => {
-    const cfg = loadConfig({ ...BASE, SNOW_USER: 'integration.user', SNOW_PASSWORD: 'p' });
-    expect(cfg.authenticatedUserName).toBe('integration.user');
-  });
-
-  it('leaves authenticatedUserName undefined for bearer auth without SNOW_AUTHENTICATED_USER', () => {
-    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
-    expect(cfg.authenticatedUserName).toBeUndefined();
-  });
-
-  it('honors explicit SNOW_AUTHENTICATED_USER over the SNOW_USER fallback', () => {
-    const cfg = loadConfig({
-      ...BASE,
-      SNOW_USER: 'integration.user',
-      SNOW_PASSWORD: 'p',
-      SNOW_AUTHENTICATED_USER: 'real.human',
-    });
-    expect(cfg.authenticatedUserName).toBe('real.human');
-  });
-
-  it('honors SNOW_AUTHENTICATED_USER when bearer auth would otherwise leave it undefined', () => {
-    const cfg = loadConfig({
-      ...BASE,
-      SNOW_OAUTH_TOKEN: 't',
-      SNOW_AUTHENTICATED_USER: 'svc.bot',
-    });
-    expect(cfg.authenticatedUserName).toBe('svc.bot');
-  });
 });

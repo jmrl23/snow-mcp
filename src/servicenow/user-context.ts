@@ -14,47 +14,26 @@ export interface UserContextApi {
   getUserContext(): Promise<UserContext>;
 }
 
-export interface UserContextOptions {
-  /**
-   * Known user_name of the authenticated principal. When set, the lookup
-   * filters sys_user by this value directly. Without it, the lookup falls
-   * back to `user_name=javascript:gs.getUser().getName()`, which only
-   * resolves for users that have the `client_callable_script_include`
-   * privilege — others get a phantom empty row.
-   */
-  authenticatedUserName?: string;
-}
-
-export function createUserContextApi(
-  tableApi: TableApi,
-  options: UserContextOptions = {},
-): UserContextApi {
+export function createUserContextApi(tableApi: TableApi): UserContextApi {
   return {
     async getUserContext() {
-      const filterByName = options.authenticatedUserName;
       const userQ = await tableApi.query('sys_user', {
-        sysparmQuery: filterByName
-          ? `user_name=${filterByName}`
-          : 'user_name=javascript:gs.getUser().getName()',
+        sysparmQuery: 'user_name=javascript:gs.getUser().getName()',
         fields: ['sys_id', 'user_name', 'name', 'email'],
         limit: 1,
         displayValue: 'false',
       });
       const u = userQ.records[0];
       if (!u) {
-        throw new ConfigError(
-          filterByName
-            ? `authenticated user not found in sys_user: user_name=${filterByName}`
-            : 'authenticated user not found in sys_user',
-        );
+        throw new ConfigError('authenticated user not found in sys_user');
       }
       if (!u.user_name) {
         throw new ConfigError(
           'Unable to identify the authenticated user: the sys_user lookup returned ' +
-            'a row with an empty user_name. This usually means the ServiceNow account ' +
-            'lacks the script-evaluation privilege required for the default lookup. ' +
-            'Set SNOW_AUTHENTICATED_USER to the exact user_name of the account this ' +
-            'process authenticates as.',
+            'a row with an empty user_name. The ServiceNow account this process ' +
+            'authenticates as lacks the `client_callable_script_include` privilege ' +
+            'required to evaluate `gs.getUser().getName()`. Grant that role to the ' +
+            'account or use one that already has it.',
         );
       }
       const userSysId = String(u.sys_id);
