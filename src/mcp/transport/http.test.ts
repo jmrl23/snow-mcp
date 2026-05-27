@@ -76,6 +76,7 @@ describe('connectHttp bearer auth', () => {
         body: INITIALIZE_BODY,
       });
       expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(300);
     } finally {
       await handle.close();
     }
