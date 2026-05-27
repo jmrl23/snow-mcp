@@ -264,6 +264,121 @@ credentials only from `process.env`; pass them via the client's `env`
 block, shell exports, or any other runtime mechanism that populates the
 process environment.
 
+### Remote server (HTTP transport)
+
+Use this when snow-mcp runs on a dedicated host (VM, container, internal
+server) and MCP clients connect from different machines — multi-user
+shared deployments or containerised clusters where every client should
+reach the same running process.
+
+#### Server-side setup
+
+Set `MCP_TRANSPORT=http` so the server opens a port instead of reading
+stdio. See [Transport](#transport) and [Auth](#auth) for the full env
+table; the additional requirements for cross-machine exposure are:
+
+```bash
+# bind to all interfaces (not just loopback)
+export MCP_HTTP_HOST=0.0.0.0
+export MCP_HTTP_PORT=17880
+
+# generate a strong bearer token — keep this value secret
+MCP_AUTH_TOKEN=$(openssl rand -base64 32)
+export MCP_AUTH_TOKEN
+```
+
+The container image already sets `MCP_HTTP_HOST=0.0.0.0` and
+`MCP_HTTP_PORT=17880` — see [Docker](#docker) for a full `docker run`
+invocation with all required env vars.
+
+> **Security — use a reverse proxy for TLS.**
+> The MCP server itself does not terminate TLS — that is intentional;
+> TLS is delegated to a reverse proxy (nginx, Caddy, Traefik, Envoy, or
+> a cloud load-balancer) in front of snow-mcp. Without a proxy the
+> bearer value travels in cleartext over plain HTTP. Configure your
+> proxy to terminate HTTPS and forward to
+> `http://127.0.0.1:<MCP_HTTP_PORT>` (localhost or a private-network
+> address); do not expose the raw port to the public internet.
+
+#### Claude Code (CLI)
+
+Add to `~/.claude.json` (user scope) or `.mcp.json` in the project root
+(project scope):
+
+```json
+{
+  "mcpServers": {
+    "snow-mcp": {
+      "type": "http",
+      "url": "https://mcp.internal.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer replace-with-token-from-openssl"
+      }
+    }
+  }
+}
+```
+
+`"type": "streamable-http"` is accepted as an alias for `"http"`. Or
+use the CLI (which writes the same JSON for you):
+
+```bash
+claude mcp add --transport http snow-mcp https://mcp.internal.example.com/mcp \
+  --header "Authorization: Bearer replace-with-token-from-openssl"
+```
+
+#### Claude Desktop
+
+Claude Desktop connects to remote MCP servers through its **Connectors
+UI**, not via `claude_desktop_config.json` (that file is for stdio
+servers only). Open Claude Desktop → Settings → Connectors → Add custom
+connector, enter `https://mcp.internal.example.com/mcp`, and complete
+the authentication prompt. Verify against the
+[current upstream docs](https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp)
+if the flow has changed.
+
+#### Cursor
+
+Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in the
+project root:
+
+```json
+{
+  "mcpServers": {
+    "snow-mcp": {
+      "url": "https://mcp.internal.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer replace-with-token-from-openssl"
+      }
+    }
+  }
+}
+```
+
+No `type` field is required — Cursor infers HTTP transport from the
+`url` field. Verify against the
+[Cursor MCP docs](https://cursor.com/docs/context/mcp)
+if the shape has changed.
+
+#### Verifying the connection
+
+From any machine with network access to the server, confirm the endpoint
+is reachable and the bearer is accepted:
+
+```bash
+curl -s \
+  -H "Authorization: Bearer replace-with-token-from-openssl" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}' \
+  https://mcp.internal.example.com/mcp
+```
+
+A JSON response containing `"result"` and `"serverInfo"` confirms the
+server is up and the bearer is valid. From within a connected client,
+ask the assistant to list available MCP tools — you should see eight
+tools under `snow-mcp`.
+
 ### Verifying
 
 After the client restarts, ask it to list available MCP tools. You
