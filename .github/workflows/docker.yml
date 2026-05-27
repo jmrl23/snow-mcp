@@ -1,0 +1,156 @@
+name: docker
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  # 250 MB uncompressed per platform (250 * 1024 * 1024).
+  MAX_IMAGE_SIZE_BYTES: '262144000'
+  OCI_TAR: /tmp/image.oci.tar
+
+jobs:
+  docker:
+    name: build + size + publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          labels: |
+            org.opencontainers.image.description=Read-only MCP server exposing a ServiceNow instance to MCP clients
+            org.opencontainers.image.licenses=MIT
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (PR — OCI tar only, no push)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          outputs: type=oci,dest=${{ env.OCI_TAR }}
+
+      - name: Build and push (main / tag — OCI tar + registry)
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          outputs: |
+            type=oci,dest=${{ env.OCI_TAR }}
+            type=registry
+
+      - name: Validate per-platform image size
+        id: size
+        run: |
+          set -euo pipefail
+
+          WORK=/tmp/oci
+          rm -rf "$WORK" && mkdir "$WORK"
+          tar -xf "$OCI_TAR" -C "$WORK"
+
+          MAX="$MAX_IMAGE_SIZE_BYTES"
+          BUDGET_MB=$(awk -v b="$MAX" 'BEGIN{ printf "%.0f", b/1024/1024 }')
+          FAILED=0
+
+          {
+            echo "## Image size report"
+            echo
+            echo "| Platform | Uncompressed | Budget | Status |"
+            echo "| --- | ---: | ---: | :---: |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # index.json lists per-platform manifests. Skip attestation/unknown entries.
+          jq -r '
+            .manifests[]
+            | select(.platform.os == "linux" and .platform.architecture != "unknown")
+            | "\(.platform.os)/\(.platform.architecture)\t\(.digest)"
+          ' "$WORK/index.json" > /tmp/platforms.tsv
+
+          if [ ! -s /tmp/platforms.tsv ]; then
+            echo "::error::No linux/* platform manifests found in OCI archive"
+            exit 1
+          fi
+
+          while IFS=$'\t' read -r PLATFORM DIGEST; do
+            HEX="${DIGEST#sha256:}"
+            BLOB="$WORK/blobs/sha256/$HEX"
+            if [ ! -f "$BLOB" ]; then
+              echo "::error::Manifest blob missing for $PLATFORM ($DIGEST)"
+              exit 1
+            fi
+            BYTES=$(jq '[.layers[].size] | add' "$BLOB")
+            MB=$(awk -v b="$BYTES" 'BEGIN{ printf "%.1f", b/1024/1024 }')
+            if [ "$BYTES" -gt "$MAX" ]; then
+              STATUS="FAIL"
+              FAILED=1
+            else
+              STATUS="OK"
+            fi
+            echo "${PLATFORM}: ${MB} MB (budget ${BUDGET_MB} MB) ${STATUS}"
+            echo "| \`${PLATFORM}\` | ${MB} MB | ${BUDGET_MB} MB | ${STATUS} |" >> "$GITHUB_STEP_SUMMARY"
+          done < /tmp/platforms.tsv
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::At least one platform exceeded the ${BUDGET_MB} MB budget"
+            exit 1
+          fi
+
+      - name: Write tag summary
+        if: always()
+        env:
+          META_TAGS: ${{ steps.meta.outputs.tags }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          {
+            echo
+            echo "## Tags"
+            if [ "$EVENT" = "pull_request" ]; then
+              echo "_PR build — no tags pushed._"
+            else
+              echo '```'
+              printf '%s\n' "$META_TAGS"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
