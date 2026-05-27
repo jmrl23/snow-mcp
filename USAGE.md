@@ -199,6 +199,43 @@ Restart Claude Code. Tools appear under the `mcp__snow-mcp__*` namespace
 > Prefer pinning to `dist/main.js` after `yarn build` for predictable
 > startup. Use `yarn dev` only when iterating on the server itself.
 
+---
+
+**Using the GHCR image instead** — skip the local clone + `yarn build`
+by pointing at the published image:
+
+```json
+{
+  "mcpServers": {
+    "snow-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "SNOW_INSTANCE_URL",
+        "-e",
+        "SNOW_OAUTH_TOKEN",
+        "-e",
+        "MCP_TRANSPORT",
+        "ghcr.io/jmrl23/snow-mcp:latest"
+      ],
+      "env": {
+        "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
+        "SNOW_OAUTH_TOKEN": "eyJraWQiOiI...",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+`-i` keeps the container's stdin open for the MCP client's JSON-RPC
+stream. `MCP_TRANSPORT=stdio` overrides the image's default of `http`.
+Forwarding env vars by name (`-e SNOW_OAUTH_TOKEN`, no `=value`) keeps
+secrets out of the args array, which `ps` and journald may log.
+
 ### Claude Desktop
 
 Edit `claude_desktop_config.json` (location depends on OS — see Claude
@@ -219,6 +256,44 @@ Desktop docs). Same shape as above:
   }
 }
 ```
+
+---
+
+**Using the GHCR image instead** — same shape, but `command: docker`
+with `args` forwarding env vars into a container:
+
+```json
+{
+  "mcpServers": {
+    "snow-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e",
+        "SNOW_INSTANCE_URL",
+        "-e",
+        "SNOW_USER",
+        "-e",
+        "SNOW_PASSWORD",
+        "-e",
+        "MCP_TRANSPORT",
+        "ghcr.io/jmrl23/snow-mcp:latest"
+      ],
+      "env": {
+        "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
+        "SNOW_USER": "integration.user",
+        "SNOW_PASSWORD": "replace-me",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+`-i` keeps the container's stdin open. `MCP_TRANSPORT=stdio` is
+required because the image's default transport is `http`.
 
 ### Cursor / other stdio MCP clients
 
