@@ -137,8 +137,18 @@ describe('loadConfig', () => {
   });
 
   it('parses MCP_TRANSPORT=http with default host and port', () => {
-    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http' });
-    expect(cfg.transport).toEqual({ kind: 'http', host: '127.0.0.1', port: 3000 });
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_TOKEN: 't',
+      MCP_TRANSPORT: 'http',
+      MCP_AUTH_TOKEN: 'secret',
+    });
+    expect(cfg.transport).toEqual({
+      kind: 'http',
+      host: '127.0.0.1',
+      port: 3000,
+      authToken: 'secret',
+    });
   });
 
   it('parses MCP_HTTP_PORT and MCP_HTTP_HOST', () => {
@@ -148,8 +158,41 @@ describe('loadConfig', () => {
       MCP_TRANSPORT: 'http',
       MCP_HTTP_PORT: '8080',
       MCP_HTTP_HOST: '0.0.0.0',
+      MCP_AUTH_TOKEN: 'secret',
     });
-    expect(cfg.transport).toEqual({ kind: 'http', host: '0.0.0.0', port: 8080 });
+    expect(cfg.transport).toEqual({
+      kind: 'http',
+      host: '0.0.0.0',
+      port: 8080,
+      authToken: 'secret',
+    });
+  });
+
+  it('trims MCP_AUTH_TOKEN and stores it on the http transport config', () => {
+    const cfg = loadConfig({
+      ...BASE,
+      SNOW_OAUTH_TOKEN: 't',
+      MCP_TRANSPORT: 'http',
+      MCP_AUTH_TOKEN: '  my-token  ',
+    });
+    expect((cfg.transport as { authToken: string }).authToken).toBe('my-token');
+  });
+
+  it('throws ConfigError when MCP_TRANSPORT=http and MCP_AUTH_TOKEN is missing', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http' })).toThrow(
+      ConfigError,
+    );
+  });
+
+  it('throws ConfigError when MCP_TRANSPORT=http and MCP_AUTH_TOKEN is blank whitespace', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_AUTH_TOKEN: '   ' }),
+    ).toThrow(ConfigError);
+  });
+
+  it('loads successfully for stdio transport without MCP_AUTH_TOKEN', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.transport.kind).toBe('stdio');
   });
 
   it('rejects MCP_TRANSPORT values other than stdio or http', () => {
