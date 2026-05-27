@@ -512,18 +512,20 @@ docker pull ghcr.io/jmrl23/snow-mcp:latest
 
 Supported tags:
 
-| Tag                      | When it's published                       |
-| ------------------------ | ----------------------------------------- |
-| `latest`                 | every push to the default branch and tags |
-| `main`                   | every push to `main`                      |
-| `vX.Y.Z` / `vX.Y` / `vX` | every `v*` git tag (semver)               |
-| `sha-<short>`            | every push (immutable per commit)         |
+| Tag             | When it's published                         |
+| --------------- | ------------------------------------------- |
+| `latest`        | every `v*` semver tag push (non-prerelease) |
+| `main`          | every push to the `main` branch             |
+| `vX.Y.Z`        | every `v*` git tag (literal tag name)       |
+| `X.Y.Z` / `X.Y` | every `v*` semver tag (`v` prefix stripped) |
+| `sha-<short>`   | every push (immutable per commit)           |
 
 Supported platforms: `linux/amd64`, `linux/arm64`.
 
-Run the published image the same way as the locally built one (replace
-`snow-mcp:local` with `ghcr.io/jmrl23/snow-mcp:latest` in any of the
-`docker run` examples above).
+Run the published image by substituting `ghcr.io/jmrl23/snow-mcp:latest`
+for `snow-mcp:local` in any `docker run` example above. For Compose, set
+`image: ghcr.io/jmrl23/snow-mcp:latest` and remove the `build:` key in
+`docker-compose.yml`.
 
 ### Updating tables of project layout
 
