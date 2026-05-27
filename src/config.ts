@@ -12,7 +12,7 @@ export interface CacheConfig {
 
 export type TransportConfig =
   | { kind: 'stdio'; host: string; port: number }
-  | { kind: 'http'; host: string; port: number };
+  | { kind: 'http'; host: string; port: number; authToken: string };
 
 export interface ServerConfig {
   instanceUrl: string;
@@ -88,7 +88,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   if (httpPort > 65535) {
     throw new ConfigError(`MCP_HTTP_PORT must be <= 65535 (got: ${httpPort})`);
   }
-  const transport: TransportConfig = { kind: transportKind, host: httpHost, port: httpPort };
+  let transport: TransportConfig;
+  if (transportKind === 'http') {
+    const authToken = env.MCP_AUTH_TOKEN?.trim();
+    if (!authToken) {
+      throw new ConfigError('MCP_AUTH_TOKEN is required when MCP_TRANSPORT=http');
+    }
+    transport = { kind: 'http', host: httpHost, port: httpPort, authToken };
+  } else {
+    transport = { kind: 'stdio', host: httpHost, port: httpPort };
+  }
 
   const explicitUser = env.SNOW_AUTHENTICATED_USER?.trim();
   const authenticatedUserName = explicitUser || (auth.kind === 'basic' ? auth.user : undefined);

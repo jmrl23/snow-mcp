@@ -18,6 +18,7 @@ export async function connectTransport(
   const handle: HttpTransportHandle = await connectHttp(server, {
     host: config.host,
     port: config.port,
+    authToken: config.authToken,
   });
   return handle;
 }

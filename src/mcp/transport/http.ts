@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import type { Server, IncomingMessage, ServerResponse } from 'node:http';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -6,6 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 export interface HttpTransportOptions {
   host: string;
   port: number;
+  authToken: string;
 }
 
 export interface HttpTransportHandle {
@@ -23,12 +25,34 @@ export async function connectHttp(
   });
   await server.connect(transport);
 
+  const expectedBuf = Buffer.from(opts.authToken);
+
   const httpServer: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
     if (!req.url || !req.url.startsWith('/mcp')) {
       res.statusCode = 404;
       res.end();
       return;
     }
+
+    const authHeader = req.headers['authorization'] ?? '';
+    const bearerMatch = /^Bearer (.*)$/i.exec(authHeader);
+    const supplied = bearerMatch ? bearerMatch[1] : null;
+
+    const isAuthorized =
+      supplied !== null &&
+      (() => {
+        const suppliedBuf = Buffer.from(supplied);
+        if (suppliedBuf.length !== expectedBuf.length) return false;
+        return timingSafeEqual(suppliedBuf, expectedBuf);
+      })();
+
+    if (!isAuthorized) {
+      res.statusCode = 401;
+      res.setHeader('WWW-Authenticate', 'Bearer realm="snow-mcp"');
+      res.end('Unauthorized');
+      return;
+    }
+
     void transport.handleRequest(req, res);
   });
 
