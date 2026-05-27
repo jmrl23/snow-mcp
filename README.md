@@ -751,7 +751,6 @@ yarn test src/servicenow
 snow-mcp/
 ├── CLAUDE.md                 # project-wide guidance for Claude Code
 ├── README.md                 # you are here
-├── USAGE.md                  # connection + tool quick reference
 ├── .claude/
 │   └── rules/                # code-quality, testing, security, error-handling
 ├── .env                      # optional local secrets file (gitignored)
@@ -797,7 +796,6 @@ snow-mcp/
 
 Project-internal docs you may also want:
 
-- [`USAGE.md`](./USAGE.md) — focused connection + tool quick reference.
 - [`CLAUDE.md`](./CLAUDE.md) — guidance for Claude Code working in this repo.
 - [`.claude/rules/`](./.claude/rules/) — code-quality, testing, security, and error-handling rules.
 
