@@ -66,6 +66,21 @@ describe('connectHttp bearer auth', () => {
     }
   });
 
+  it('accepts a lowercase "bearer" scheme (RFC 7235 case-insensitive)', async () => {
+    const server = new McpServer({ name: 'test', version: '0.0.0' });
+    const handle = await connectHttp(server, { host: '127.0.0.1', port: 0, authToken: TEST_TOKEN });
+    try {
+      const res = await fetch(`http://127.0.0.1:${handle.port}/mcp`, {
+        method: 'POST',
+        headers: { ...MCP_HEADERS, authorization: `bearer ${TEST_TOKEN}` },
+        body: INITIALIZE_BODY,
+      });
+      expect(res.status).not.toBe(401);
+    } finally {
+      await handle.close();
+    }
+  });
+
   it('responds 2xx to MCP initialize with correct Bearer token', async () => {
     const server = new McpServer({ name: 'test', version: '0.0.0' });
     const handle = await connectHttp(server, { host: '127.0.0.1', port: 0, authToken: TEST_TOKEN });

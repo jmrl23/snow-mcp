@@ -35,7 +35,8 @@ export async function connectHttp(
     }
 
     const authHeader = req.headers['authorization'] ?? '';
-    const supplied = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+    const bearerMatch = /^Bearer (.*)$/i.exec(authHeader);
+    const supplied = bearerMatch ? bearerMatch[1] : null;
 
     const isAuthorized =
       supplied !== null &&
