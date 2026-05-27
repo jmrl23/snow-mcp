@@ -99,15 +99,41 @@ jobs:
             echo "| --- | ---: | ---: | :---: |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # index.json lists per-platform manifests. Skip attestation/unknown entries.
-          jq -r '
-            .manifests[]
-            | select(.platform.os == "linux" and .platform.architecture != "unknown")
-            | "\(.platform.os)/\(.platform.architecture)\t\(.digest)"
-          ' "$WORK/index.json" > /tmp/platforms.tsv
+          # buildx OCI export sometimes nests the per-platform manifests one level
+          # deep (top-level index has a single entry pointing to a nested index).
+          # Look at the top level first; if empty, descend one level.
+          extract_platforms() {
+            jq -r '
+              .manifests[]
+              | select(.platform.os == "linux"
+                       and .platform.architecture != null
+                       and .platform.architecture != "unknown")
+              | "\(.platform.os)/\(.platform.architecture)\t\(.digest)"
+            ' "$1"
+          }
+
+          extract_platforms "$WORK/index.json" > /tmp/platforms.tsv
+
+          if [ ! -s /tmp/platforms.tsv ]; then
+            while read -r CHILD_DIGEST; do
+              [ -z "$CHILD_DIGEST" ] && continue
+              CHILD_HEX="${CHILD_DIGEST#sha256:}"
+              CHILD_BLOB="$WORK/blobs/sha256/$CHILD_HEX"
+              [ -f "$CHILD_BLOB" ] || continue
+              if jq -e '.manifests' "$CHILD_BLOB" >/dev/null 2>&1; then
+                extract_platforms "$CHILD_BLOB" >> /tmp/platforms.tsv
+              fi
+            done < <(jq -r '.manifests[].digest // empty' "$WORK/index.json")
+          fi
 
           if [ ! -s /tmp/platforms.tsv ]; then
             echo "::error::No linux/* platform manifests found in OCI archive"
+            echo "::group::index.json"
+            cat "$WORK/index.json"
+            echo "::endgroup::"
+            echo "::group::blobs"
+            find "$WORK/blobs/sha256" -maxdepth 1 -type f | head -20
+            echo "::endgroup::"
             exit 1
           fi
 
