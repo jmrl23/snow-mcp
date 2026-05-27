@@ -49,7 +49,7 @@ describe('UserContextApi.getUserContext', () => {
     });
   });
 
-  it('uses the script-eval filter when no authenticatedUserName hint is given', async () => {
+  it('looks up the authenticated user via the gs.getUser().getName() script-eval filter', async () => {
     const tableApi = buildTableApi(fullPopulatedQuery);
     const api = createUserContextApi(tableApi);
     await api.getUserContext();
@@ -58,16 +58,6 @@ describe('UserContextApi.getUserContext', () => {
       expect.objectContaining({
         sysparmQuery: 'user_name=javascript:gs.getUser().getName()',
       }),
-    );
-  });
-
-  it('queries sys_user by the supplied authenticatedUserName when provided', async () => {
-    const tableApi = buildTableApi(fullPopulatedQuery);
-    const api = createUserContextApi(tableApi, { authenticatedUserName: 'jagaitera' });
-    await api.getUserContext();
-    expect(tableApi.query).toHaveBeenCalledWith(
-      'sys_user',
-      expect.objectContaining({ sysparmQuery: 'user_name=jagaitera' }),
     );
   });
 
@@ -83,6 +73,6 @@ describe('UserContextApi.getUserContext', () => {
       total: 1,
     }));
     const api = createUserContextApi(tableApi);
-    await expect(api.getUserContext()).rejects.toThrow(/SNOW_AUTHENTICATED_USER/);
+    await expect(api.getUserContext()).rejects.toThrow(/client_callable_script_include/);
   });
 });
