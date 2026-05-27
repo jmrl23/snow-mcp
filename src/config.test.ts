@@ -175,7 +175,12 @@ describe('loadConfig', () => {
       MCP_TRANSPORT: 'http',
       MCP_AUTH_TOKEN: '  my-token  ',
     });
-    expect((cfg.transport as { authToken: string }).authToken).toBe('my-token');
+    expect(cfg.transport).toEqual({
+      kind: 'http',
+      host: '127.0.0.1',
+      port: 3000,
+      authToken: 'my-token',
+    });
   });
 
   it('throws ConfigError when MCP_TRANSPORT=http and MCP_AUTH_TOKEN is missing', () => {
