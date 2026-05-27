@@ -74,7 +74,7 @@ yarn start
 >   -e SNOW_USER=integration.user \
 >   -e SNOW_PASSWORD=replace-me \
 >   -p 17880:17880 \
->   ghcr.io/jmrl23/snow-mcp:latest
+>   ghcr.io/jmrl23/snow-mcp:main
 > ```
 >
 > See [Container image (GHCR)](#container-image-ghcr) for tag matrix and platforms.
@@ -521,7 +521,7 @@ Pre-built multi-arch images are published to GitHub Container Registry
 on every push to `main` and on every `v*` git tag. Pull the latest:
 
 ```bash
-docker pull ghcr.io/jmrl23/snow-mcp:latest
+docker pull ghcr.io/jmrl23/snow-mcp:main
 ```
 
 Supported tags:
@@ -536,9 +536,9 @@ Supported tags:
 
 Supported platforms: `linux/amd64`, `linux/arm64`.
 
-Run the published image by substituting `ghcr.io/jmrl23/snow-mcp:latest`
+Run the published image by substituting `ghcr.io/jmrl23/snow-mcp:main`
 for `snow-mcp:local` in any `docker run` example above. For Compose, set
-`image: ghcr.io/jmrl23/snow-mcp:latest` and remove the `build:` key in
+`image: ghcr.io/jmrl23/snow-mcp:main` and remove the `build:` key in
 `docker-compose.yml`.
 
 ### Updating tables of project layout

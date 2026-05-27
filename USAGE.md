@@ -219,7 +219,7 @@ by pointing at the published image:
         "SNOW_OAUTH_TOKEN",
         "-e",
         "MCP_TRANSPORT",
-        "ghcr.io/jmrl23/snow-mcp:latest"
+        "ghcr.io/jmrl23/snow-mcp:main"
       ],
       "env": {
         "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
@@ -279,7 +279,7 @@ with `args` forwarding env vars into a container:
         "SNOW_PASSWORD",
         "-e",
         "MCP_TRANSPORT",
-        "ghcr.io/jmrl23/snow-mcp:latest"
+        "ghcr.io/jmrl23/snow-mcp:main"
       ],
       "env": {
         "SNOW_INSTANCE_URL": "https://your-instance.service-now.com",
@@ -328,7 +328,7 @@ docker run --rm \
   -e SNOW_USER=integration.user \
   -e SNOW_PASSWORD=replace-me \
   -p 17880:17880 \
-  ghcr.io/jmrl23/snow-mcp:latest
+  ghcr.io/jmrl23/snow-mcp:main
 ```
 
 Supports `linux/amd64` and `linux/arm64`. See the README's
