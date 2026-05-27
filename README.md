@@ -501,6 +501,30 @@ docker run --rm \
   snow-mcp:local
 ```
 
+### Container image (GHCR)
+
+Pre-built multi-arch images are published to GitHub Container Registry
+on every push to `main` and on every `v*` git tag. Pull the latest:
+
+```bash
+docker pull ghcr.io/jmrl23/snow-mcp:latest
+```
+
+Supported tags:
+
+| Tag                      | When it's published                       |
+| ------------------------ | ----------------------------------------- |
+| `latest`                 | every push to the default branch and tags |
+| `main`                   | every push to `main`                      |
+| `vX.Y.Z` / `vX.Y` / `vX` | every `v*` git tag (semver)               |
+| `sha-<short>`            | every push (immutable per commit)         |
+
+Supported platforms: `linux/amd64`, `linux/arm64`.
+
+Run the published image the same way as the locally built one (replace
+`snow-mcp:local` with `ghcr.io/jmrl23/snow-mcp:latest` in any of the
+`docker run` examples above).
+
 ### Updating tables of project layout
 
 No need — `Dockerfile`, `.dockerignore`, and `docker-compose.yml` at
