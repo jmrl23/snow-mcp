@@ -302,6 +302,9 @@ credentials only from `process.env`; pass them via the client's `env`
 block, shell exports, or any other mechanism that populates the process
 environment.
 
+For the Docker variant, copy the Claude Desktop GHCR JSON above and
+adjust the auth env vars to whichever form your setup uses.
+
 ### Verifying the connection
 
 After the client restarts, ask it to list available MCP tools. You should
@@ -310,9 +313,32 @@ see eight tools under `snow-mcp` (see §5) and one resource
 
 ### Running in Docker
 
-The repo ships a multi-stage Dockerfile with a distroless runtime
-stage. The container defaults to the HTTP transport on port `17880`.
-Pass credentials via `-e` flags:
+Two paths: pull the pre-built multi-arch image from GHCR (faster, no
+local Node toolchain needed), or build from the included Dockerfile
+(useful if you're hacking on the source).
+
+Either way the container defaults to the HTTP transport on port
+`17880`. Pass credentials via `-e` flags.
+
+#### Pull the pre-built image (recommended)
+
+```bash
+docker run --rm \
+  -e SNOW_INSTANCE_URL=https://your-instance.service-now.com \
+  -e SNOW_USER=integration.user \
+  -e SNOW_PASSWORD=replace-me \
+  -p 17880:17880 \
+  ghcr.io/jmrl23/snow-mcp:latest
+```
+
+Supports `linux/amd64` and `linux/arm64`. See the README's
+[Container image (GHCR)](README.md#container-image-ghcr) section for
+the full tag matrix (`latest`, `main`, `sha-<short>`, semver patterns).
+
+#### Build locally
+
+Useful when you've modified the source and want a `:local` image
+without pushing anywhere:
 
 ```bash
 docker build -t snow-mcp:local .
@@ -324,8 +350,8 @@ docker run --rm \
   snow-mcp:local
 ```
 
-See the [Docker](README.md#docker) section in the README for compose and
-port-override examples.
+See the [Docker](README.md#docker) section in the README for compose
+and port-override examples.
 
 ---
 
