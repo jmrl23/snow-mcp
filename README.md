@@ -171,12 +171,13 @@ OAuth client_credentials fetches a token from `${SNOW_INSTANCE_URL}/oauth_token.
 
 ### Transport
 
-| Variable         | Default     | Notes                                                                             |
-| ---------------- | ----------- | --------------------------------------------------------------------------------- |
-| `MCP_TRANSPORT`  | `stdio`     | Set to `http` for Streamable HTTP.                                                |
-| `MCP_HTTP_HOST`  | `127.0.0.1` | Only used when `MCP_TRANSPORT=http`.                                              |
-| `MCP_HTTP_PORT`  | `3000`      | Only used when `MCP_TRANSPORT=http`.                                              |
-| `MCP_AUTH_TOKEN` | _required_  | Shared bearer token. **Required when `MCP_TRANSPORT=http`**; ignored under stdio. |
+| Variable         | Default     | Notes                                                                                                                                      |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MCP_TRANSPORT`  | `stdio`     | Set to `http` for Streamable HTTP.                                                                                                         |
+| `MCP_HTTP_HOST`  | `127.0.0.1` | Only used when `MCP_TRANSPORT=http`.                                                                                                       |
+| `MCP_HTTP_PORT`  | `3000`      | Only used when `MCP_TRANSPORT=http`.                                                                                                       |
+| `MCP_AUTH_TOKEN` | _required_  | Shared bearer token. **Required when `MCP_TRANSPORT=http`**; ignored under stdio.                                                          |
+| `REDIS_URL`      | _required_  | Redis connection URL. **Required when `MCP_TRANSPORT=http`**; ignored under stdio. The compose files default this to `redis://redis:6379`. |
 
 The HTTP transport binds to localhost by default. To expose it to other machines, set `MCP_HTTP_HOST=0.0.0.0` and ensure your network/firewall is configured appropriately.
 
@@ -184,12 +185,12 @@ When `MCP_TRANSPORT=http`, every request to `/mcp` must include `Authorization: 
 
 ### Schema cache
 
-`describe_table` and `list_tables` cache results in memory to avoid repeated `sys_dictionary` and `sys_db_object` lookups. Defaults:
+`describe_table` and `list_tables` cache results to avoid repeated `sys_dictionary` and `sys_db_object` lookups. Under `stdio`, the cache is in-memory (TTL + LRU). Under `http`, results are stored in Redis so they are shared across all per-request server instances. Defaults:
 
-| Variable                   | Default  | Notes                                       |
-| -------------------------- | -------- | ------------------------------------------- |
-| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache. |
-| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries per tool.        |
+| Variable                   | Default  | Notes                                                |
+| -------------------------- | -------- | ---------------------------------------------------- |
+| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache.          |
+| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries (in-memory / stdio only). |
 
 After a schema customization in ServiceNow, restart the server or wait for the TTL to expire.
 
@@ -611,9 +612,19 @@ docker compose up --build
 
 The provided `docker-compose.yml` substitutes `${VAR}` from your shell
 environment and forces `MCP_TRANSPORT=http`, `MCP_HTTP_HOST=0.0.0.0`,
-`MCP_HTTP_PORT=17880`. If you prefer a file, compose also auto-loads
+`MCP_HTTP_PORT=17880`. It also starts a `redis:8-alpine` sidecar
+(`snow-mcp-redis`) automatically — no separate Redis setup needed.
+`REDIS_URL` defaults to `redis://redis:6379` (the sidecar). If you prefer a file, compose also auto-loads
 `.env` from the project directory for `${VAR}` substitution — no flag
 needed; just have a `.env` present.
+
+To run the pre-built image from GHCR instead of building locally, use
+`docker-compose.ghcr.yml`. It includes the same Redis sidecar and accepts the same environment variables
+with the same defaults — no other changes needed:
+
+```bash
+docker compose -f docker-compose.ghcr.yml up
+```
 
 ### Use a different port
 
@@ -653,9 +664,8 @@ Supported tags:
 Supported platforms: `linux/amd64`, `linux/arm64`.
 
 Run the published image by substituting `ghcr.io/jmrl23/snow-mcp:main`
-for `snow-mcp:local` in any `docker run` example above. For Compose, set
-`image: ghcr.io/jmrl23/snow-mcp:main` and remove the `build:` key in
-`docker-compose.yml`.
+for `snow-mcp:local` in any `docker run` example above. For Compose, use
+the ready-made `docker-compose.ghcr.yml` (see [§ Compose](#compose)).
 
 ### Updating tables of project layout
 
@@ -762,6 +772,7 @@ snow-mcp/
 ├── Dockerfile
 ├── .dockerignore
 ├── docker-compose.yml
+├── docker-compose.ghcr.yml   # pulls from GHCR (no local build)
 ├── src/
 │   ├── main.ts               # entry point (selects transport from config)
 │   ├── config.ts             # env parsing & validation

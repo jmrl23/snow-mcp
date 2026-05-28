@@ -14,11 +14,16 @@ export type TransportConfig =
   | { kind: 'stdio'; host: string; port: number }
   | { kind: 'http'; host: string; port: number; authToken: string };
 
+export interface RedisConfig {
+  url: string;
+}
+
 export interface ServerConfig {
   instanceUrl: string;
   auth: AuthConfig;
   cache: CacheConfig;
   transport: TransportConfig;
+  redis?: RedisConfig;
 }
 
 const REQUIRED_AUTH_HINT =
@@ -91,7 +96,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     transport = { kind: 'stdio', host: httpHost, port: httpPort };
   }
 
-  return { instanceUrl, auth, cache, transport };
+  let redis: RedisConfig | undefined;
+  if (transport.kind === 'http') {
+    const redisUrl = env.REDIS_URL?.trim();
+    if (!redisUrl) {
+      throw new ConfigError('REDIS_URL is required when MCP_TRANSPORT=http');
+    }
+    redis = { url: redisUrl };
+  }
+
+  return { instanceUrl, auth, cache, transport, redis };
 }
 
 function parseIntEnv(

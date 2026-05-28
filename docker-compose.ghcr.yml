@@ -1,7 +1,6 @@
 services:
   snow-mcp:
-    build: .
-    image: snow-mcp:local
+    image: ghcr.io/jmrl23/snow-mcp:main
     container_name: snow-mcp
     restart: unless-stopped
     # Provide ServiceNow credentials via your shell or an orchestrator

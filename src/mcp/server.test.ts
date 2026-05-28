@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMcpServer } from './server.js';
+import { createMcpServer, createServerCaches } from './server.js';
 import type { ServiceNowClient } from '../servicenow/client.js';
 
 function fakeClient(): ServiceNowClient {
@@ -14,7 +14,7 @@ function fakeClient(): ServiceNowClient {
 
 describe('createMcpServer', () => {
   it('registers the 8 tools and the tables resource', () => {
-    const server = createMcpServer(fakeClient(), { ttlMs: 0, maxEntries: 1 });
+    const server = createMcpServer(fakeClient(), createServerCaches({ ttlMs: 0, maxEntries: 1 }));
     // McpServer exposes lower-level Server via .server. We just confirm it built.
     expect(server.server).toBeDefined();
     // Indirect check: introspect registered tools via the internal map (test-only access).

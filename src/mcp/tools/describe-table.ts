@@ -26,7 +26,7 @@ export function createDescribeTableTool(
     inputShape: describeTableInput,
     handler: (input) =>
       runTool(async () => {
-        const cached = cache.get(input.name);
+        const cached = await cache.get(input.name);
         if (cached !== undefined) return cached;
 
         const meta = await client.table.query<{
@@ -80,7 +80,7 @@ export function createDescribeTableTool(
             readOnly: f.read_only === 'true',
           })),
         };
-        cache.set(input.name, out);
+        await cache.set(input.name, out);
         return out;
       }),
   };

@@ -4,9 +4,9 @@ export interface SchemaCacheOptions {
 }
 
 export interface SchemaCache<T> {
-  get(key: string): T | undefined;
-  set(key: string, value: T): void;
-  clear(): void;
+  get(key: string): Promise<T | undefined>;
+  set(key: string, value: T): Promise<void>;
+  clear(): Promise<void>;
 }
 
 interface Entry<T> {
@@ -19,7 +19,7 @@ export function createSchemaCache<T>(opts: SchemaCacheOptions): SchemaCache<T> {
   const disabled = opts.ttlMs <= 0;
 
   return {
-    get(key) {
+    async get(key) {
       if (disabled) return undefined;
       const entry = store.get(key);
       if (!entry) return undefined;
@@ -29,7 +29,7 @@ export function createSchemaCache<T>(opts: SchemaCacheOptions): SchemaCache<T> {
       }
       return entry.value;
     },
-    set(key, value) {
+    async set(key, value) {
       if (disabled) return;
       if (store.has(key)) store.delete(key);
       store.set(key, { value, expiresAt: Date.now() + opts.ttlMs });
@@ -39,7 +39,7 @@ export function createSchemaCache<T>(opts: SchemaCacheOptions): SchemaCache<T> {
         store.delete(oldest);
       }
     },
-    clear() {
+    async clear() {
       store.clear();
     },
   };
