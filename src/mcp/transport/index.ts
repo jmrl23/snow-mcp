@@ -8,14 +8,15 @@ export interface TransportHandle {
 }
 
 export async function connectTransport(
-  server: McpServer,
+  serverFactory: () => McpServer,
   config: TransportConfig,
 ): Promise<TransportHandle> {
   if (config.kind === 'stdio') {
-    await connectStdio(server);
+    // stdio is single-client: resolve the factory once at connection time.
+    await connectStdio(serverFactory());
     return { async close() {} };
   }
-  const handle: HttpTransportHandle = await connectHttp(server, {
+  const handle: HttpTransportHandle = await connectHttp(serverFactory, {
     host: config.host,
     port: config.port,
     authToken: config.authToken,

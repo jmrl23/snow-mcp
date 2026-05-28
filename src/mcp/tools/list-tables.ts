@@ -36,7 +36,7 @@ export function createListTablesTool(
     inputShape: listTablesInput,
     handler: (input) =>
       runTool(async () => {
-        let rows = cache.get(ALL_KEY);
+        let rows = await cache.get(ALL_KEY);
         if (!rows) {
           const out = await client.table.query<{
             name: string;
@@ -49,7 +49,7 @@ export function createListTablesTool(
             offset: 0,
           });
           rows = out.records.map(({ name, label, super_class }) => ({ name, label, super_class }));
-          cache.set(ALL_KEY, rows);
+          await cache.set(ALL_KEY, rows);
         }
         const f = input.filter?.toLowerCase();
         return f

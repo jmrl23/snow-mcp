@@ -136,13 +136,16 @@ describe('loadConfig', () => {
     expect(cfg.transport).toEqual({ kind: 'stdio', host: '127.0.0.1', port: 3000 });
   });
 
+  const HTTP_BASE = {
+    ...BASE,
+    SNOW_OAUTH_TOKEN: 't',
+    MCP_TRANSPORT: 'http',
+    MCP_AUTH_TOKEN: 'secret',
+    REDIS_URL: 'redis://redis:6379',
+  };
+
   it('parses MCP_TRANSPORT=http with default host and port', () => {
-    const cfg = loadConfig({
-      ...BASE,
-      SNOW_OAUTH_TOKEN: 't',
-      MCP_TRANSPORT: 'http',
-      MCP_AUTH_TOKEN: 'secret',
-    });
+    const cfg = loadConfig(HTTP_BASE);
     expect(cfg.transport).toEqual({
       kind: 'http',
       host: '127.0.0.1',
@@ -153,12 +156,9 @@ describe('loadConfig', () => {
 
   it('parses MCP_HTTP_PORT and MCP_HTTP_HOST', () => {
     const cfg = loadConfig({
-      ...BASE,
-      SNOW_OAUTH_TOKEN: 't',
-      MCP_TRANSPORT: 'http',
+      ...HTTP_BASE,
       MCP_HTTP_PORT: '8080',
       MCP_HTTP_HOST: '0.0.0.0',
-      MCP_AUTH_TOKEN: 'secret',
     });
     expect(cfg.transport).toEqual({
       kind: 'http',
@@ -169,12 +169,7 @@ describe('loadConfig', () => {
   });
 
   it('trims MCP_AUTH_TOKEN and stores it on the http transport config', () => {
-    const cfg = loadConfig({
-      ...BASE,
-      SNOW_OAUTH_TOKEN: 't',
-      MCP_TRANSPORT: 'http',
-      MCP_AUTH_TOKEN: '  my-token  ',
-    });
+    const cfg = loadConfig({ ...HTTP_BASE, MCP_AUTH_TOKEN: '  my-token  ' });
     expect(cfg.transport).toEqual({
       kind: 'http',
       host: '127.0.0.1',
@@ -184,15 +179,59 @@ describe('loadConfig', () => {
   });
 
   it('throws ConfigError when MCP_TRANSPORT=http and MCP_AUTH_TOKEN is missing', () => {
-    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http' })).toThrow(
-      ConfigError,
-    );
+    expect(() =>
+      loadConfig({
+        ...BASE,
+        SNOW_OAUTH_TOKEN: 't',
+        MCP_TRANSPORT: 'http',
+        REDIS_URL: 'redis://redis:6379',
+      }),
+    ).toThrow(ConfigError);
   });
 
   it('throws ConfigError when MCP_TRANSPORT=http and MCP_AUTH_TOKEN is blank whitespace', () => {
     expect(() =>
-      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_AUTH_TOKEN: '   ' }),
+      loadConfig({
+        ...BASE,
+        SNOW_OAUTH_TOKEN: 't',
+        MCP_TRANSPORT: 'http',
+        MCP_AUTH_TOKEN: '   ',
+        REDIS_URL: 'redis://redis:6379',
+      }),
     ).toThrow(ConfigError);
+  });
+
+  it('throws ConfigError when MCP_TRANSPORT=http and REDIS_URL is missing', () => {
+    expect(() =>
+      loadConfig({
+        ...BASE,
+        SNOW_OAUTH_TOKEN: 't',
+        MCP_TRANSPORT: 'http',
+        MCP_AUTH_TOKEN: 'secret',
+      }),
+    ).toThrow(/REDIS_URL/);
+  });
+
+  it('throws ConfigError when MCP_TRANSPORT=http and REDIS_URL is blank', () => {
+    expect(() =>
+      loadConfig({
+        ...BASE,
+        SNOW_OAUTH_TOKEN: 't',
+        MCP_TRANSPORT: 'http',
+        MCP_AUTH_TOKEN: 'secret',
+        REDIS_URL: '   ',
+      }),
+    ).toThrow(/REDIS_URL/);
+  });
+
+  it('sets redis.url from REDIS_URL when MCP_TRANSPORT=http', () => {
+    const cfg = loadConfig(HTTP_BASE);
+    expect(cfg.redis).toEqual({ url: 'redis://redis:6379' });
+  });
+
+  it('does not set redis config when MCP_TRANSPORT=stdio', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.redis).toBeUndefined();
   });
 
   it('loads successfully for stdio transport without MCP_AUTH_TOKEN', () => {
@@ -207,14 +246,10 @@ describe('loadConfig', () => {
   });
 
   it('rejects MCP_HTTP_PORT below 1', () => {
-    expect(() =>
-      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '0' }),
-    ).toThrow(/MCP_HTTP_PORT/);
+    expect(() => loadConfig({ ...HTTP_BASE, MCP_HTTP_PORT: '0' })).toThrow(/MCP_HTTP_PORT/);
   });
 
   it('rejects MCP_HTTP_PORT above 65535', () => {
-    expect(() =>
-      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', MCP_TRANSPORT: 'http', MCP_HTTP_PORT: '70000' }),
-    ).toThrow(/MCP_HTTP_PORT/);
+    expect(() => loadConfig({ ...HTTP_BASE, MCP_HTTP_PORT: '70000' })).toThrow(/MCP_HTTP_PORT/);
   });
 });
