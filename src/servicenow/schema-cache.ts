@@ -1,3 +1,5 @@
+import { LRUCache } from 'lru-cache';
+
 export interface SchemaCacheOptions {
   ttlMs: number;
   maxEntries: number;
@@ -9,38 +11,34 @@ export interface SchemaCache<T> {
   clear(): Promise<void>;
 }
 
-interface Entry<T> {
-  value: T;
-  expiresAt: number;
+export function createNoopSchemaCache<T>(): SchemaCache<T> {
+  return {
+    async get() {
+      return undefined;
+    },
+    async set() {},
+    async clear() {},
+  };
 }
 
 export function createSchemaCache<T>(opts: SchemaCacheOptions): SchemaCache<T> {
-  const store = new Map<string, Entry<T>>();
-  const disabled = opts.ttlMs <= 0;
+  if (opts.ttlMs <= 0) return createNoopSchemaCache<T>();
+
+  const cache = new LRUCache<string, T>({
+    max: opts.maxEntries,
+    ttl: opts.ttlMs,
+    allowStale: false,
+  });
 
   return {
     async get(key) {
-      if (disabled) return undefined;
-      const entry = store.get(key);
-      if (!entry) return undefined;
-      if (Date.now() >= entry.expiresAt) {
-        store.delete(key);
-        return undefined;
-      }
-      return entry.value;
+      return cache.get(key);
     },
     async set(key, value) {
-      if (disabled) return;
-      if (store.has(key)) store.delete(key);
-      store.set(key, { value, expiresAt: Date.now() + opts.ttlMs });
-      while (store.size > opts.maxEntries) {
-        const oldest = store.keys().next().value;
-        if (oldest === undefined) break;
-        store.delete(oldest);
-      }
+      cache.set(key, value);
     },
     async clear() {
-      store.clear();
+      cache.clear();
     },
   };
 }
