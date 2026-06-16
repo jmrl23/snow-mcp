@@ -27,12 +27,12 @@ export function createSchemaCache<T>(opts: SchemaCacheOptions): SchemaCache<T> {
   const cache = new LRUCache<string, { v: T }>({
     max: opts.maxEntries,
     ttl: opts.ttlMs,
-    allowStale: false,
     perf: { now: () => Date.now() },
   });
 
   return {
     async get(key) {
+      // NOTE: undefined-safe wrapper — lru-cache uses undefined as "not found" sentinel
       return cache.get(key)?.v;
     },
     async set(key, value) {
