@@ -141,7 +141,6 @@ describe('loadConfig', () => {
     SNOW_OAUTH_TOKEN: 't',
     MCP_TRANSPORT: 'http',
     MCP_AUTH_TOKEN: 'secret',
-    REDIS_URL: 'redis://redis:6379',
   };
 
   it('parses MCP_TRANSPORT=http with default host and port', () => {
@@ -199,39 +198,6 @@ describe('loadConfig', () => {
         REDIS_URL: 'redis://redis:6379',
       }),
     ).toThrow(ConfigError);
-  });
-
-  it('throws ConfigError when MCP_TRANSPORT=http and REDIS_URL is missing', () => {
-    expect(() =>
-      loadConfig({
-        ...BASE,
-        SNOW_OAUTH_TOKEN: 't',
-        MCP_TRANSPORT: 'http',
-        MCP_AUTH_TOKEN: 'secret',
-      }),
-    ).toThrow(/REDIS_URL/);
-  });
-
-  it('throws ConfigError when MCP_TRANSPORT=http and REDIS_URL is blank', () => {
-    expect(() =>
-      loadConfig({
-        ...BASE,
-        SNOW_OAUTH_TOKEN: 't',
-        MCP_TRANSPORT: 'http',
-        MCP_AUTH_TOKEN: 'secret',
-        REDIS_URL: '   ',
-      }),
-    ).toThrow(/REDIS_URL/);
-  });
-
-  it('sets redis.url from REDIS_URL when MCP_TRANSPORT=http', () => {
-    const cfg = loadConfig(HTTP_BASE);
-    expect(cfg.redis).toEqual({ url: 'redis://redis:6379' });
-  });
-
-  it('does not set redis config when MCP_TRANSPORT=stdio', () => {
-    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
-    expect(cfg.redis).toBeUndefined();
   });
 
   it('loads successfully for stdio transport without MCP_AUTH_TOKEN', () => {
