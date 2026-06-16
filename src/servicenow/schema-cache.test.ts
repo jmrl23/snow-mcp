@@ -2,6 +2,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { createSchemaCache, createNoopSchemaCache } from './schema-cache.js';
 
 describe('createSchemaCache', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
   it('returns set value on get within ttl', async () => {
     const cache = createSchemaCache<number>({ ttlMs: 1000, maxEntries: 10 });
     await cache.set('a', 1);
@@ -9,17 +12,16 @@ describe('createSchemaCache', () => {
   });
 
   it('returns undefined when entry has expired', async () => {
-    const cache = createSchemaCache<number>({ ttlMs: 50, maxEntries: 10 });
+    const cache = createSchemaCache<number>({ ttlMs: 1000, maxEntries: 10 });
     await cache.set('a', 1);
-    await new Promise((resolve) => setTimeout(resolve, 51));
+    vi.advanceTimersByTime(1001);
     expect(await cache.get('a')).toBeUndefined();
   });
 
   it('is still valid at the exact ttl boundary (lru-cache uses strict > for staleness)', async () => {
-    const cache = createSchemaCache<number>({ ttlMs: 50, maxEntries: 10 });
+    const cache = createSchemaCache<number>({ ttlMs: 1000, maxEntries: 10 });
     await cache.set('a', 1);
-    // Wait just under the TTL boundary
-    await new Promise((resolve) => setTimeout(resolve, 49));
+    vi.advanceTimersByTime(1000);
     expect(await cache.get('a')).toBe(1);
   });
 

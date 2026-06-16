@@ -24,18 +24,19 @@ export function createNoopSchemaCache<T>(): SchemaCache<T> {
 export function createSchemaCache<T>(opts: SchemaCacheOptions): SchemaCache<T> {
   if (opts.ttlMs <= 0) return createNoopSchemaCache<T>();
 
-  const cache = new LRUCache<string, T>({
+  const cache = new LRUCache<string, { v: T }>({
     max: opts.maxEntries,
     ttl: opts.ttlMs,
     allowStale: false,
+    perf: { now: () => Date.now() },
   });
 
   return {
     async get(key) {
-      return cache.get(key);
+      return cache.get(key)?.v;
     },
     async set(key, value) {
-      cache.set(key, value);
+      cache.set(key, { v: value });
     },
     async clear() {
       cache.clear();
