@@ -23,15 +23,5 @@ services:
       MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?MCP_AUTH_TOKEN is required when MCP_TRANSPORT=http}
       SCHEMA_CACHE_TTL_MS: ${SCHEMA_CACHE_TTL_MS:-}
       SCHEMA_CACHE_MAX_ENTRIES: ${SCHEMA_CACHE_MAX_ENTRIES:-}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-    depends_on:
-      - redis
     ports:
       - '17880:17880'
-
-  redis:
-    image: redis:8-alpine
-    container_name: snow-mcp-redis
-    restart: unless-stopped
-    # no published port — internal only
-    # no volume — cache is ephemeral
