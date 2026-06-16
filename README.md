@@ -184,12 +184,12 @@ When `MCP_TRANSPORT=http`, every request to `/mcp` must include `Authorization: 
 
 ### Schema cache
 
-`describe_table` and `list_tables` cache results to avoid repeated `sys_dictionary` and `sys_db_object` lookups. The cache is in-memory with LRU eviction (stdio and http). Defaults:
+`describe_table` and `list_tables` cache results to avoid repeated `sys_dictionary` and `sys_db_object` lookups. The HTTP transport uses an in-memory LRU cache; stdio is stateless and fetches fresh on every call. Defaults:
 
-| Variable                   | Default  | Notes                                                |
-| -------------------------- | -------- | ---------------------------------------------------- |
-| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache.          |
-| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries (in-memory / stdio only). |
+| Variable                   | Default  | Notes                                             |
+| -------------------------- | -------- | ------------------------------------------------- |
+| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache.       |
+| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries (http transport only). |
 
 After a schema customization in ServiceNow, restart the server or wait for the TTL to expire.
 
