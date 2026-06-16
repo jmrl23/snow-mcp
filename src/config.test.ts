@@ -183,7 +183,6 @@ describe('loadConfig', () => {
         ...BASE,
         SNOW_OAUTH_TOKEN: 't',
         MCP_TRANSPORT: 'http',
-        REDIS_URL: 'redis://redis:6379',
       }),
     ).toThrow(ConfigError);
   });
@@ -195,7 +194,6 @@ describe('loadConfig', () => {
         SNOW_OAUTH_TOKEN: 't',
         MCP_TRANSPORT: 'http',
         MCP_AUTH_TOKEN: '   ',
-        REDIS_URL: 'redis://redis:6379',
       }),
     ).toThrow(ConfigError);
   });
