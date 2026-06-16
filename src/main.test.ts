@@ -42,7 +42,6 @@ describe('buildServer', () => {
         SNOW_OAUTH_TOKEN: 't',
         MCP_TRANSPORT: 'http',
         MCP_AUTH_TOKEN: 'test-auth-token',
-        REDIS_URL: 'redis://redis:6379',
       }),
     ).toThrow(/buildServer\(\) does not support MCP_TRANSPORT=http/);
   });
