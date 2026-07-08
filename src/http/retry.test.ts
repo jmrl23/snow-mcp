@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { withRetry, parseRetryAfter } from './retry.js';
+import { ServiceNowTimeoutError } from '../errors.js';
 
 function _makeFetch(responses: Array<() => Promise<Response>>): typeof fetch {
   let i = 0;
@@ -54,6 +55,15 @@ describe('withRetry', () => {
   it('retries network errors like 5xx', async () => {
     const fn = vi.fn();
     fn.mockRejectedValueOnce(Object.assign(new Error('boom'), { code: 'ECONNRESET' }));
+    fn.mockResolvedValueOnce(new Response('ok', { status: 200 }));
+    const res = await withRetry(fn, { maxAttempts: 3, baseDelayMs: 1, jitterPct: 0 });
+    expect(res.status).toBe(200);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries ServiceNowTimeoutError like a transient network error', async () => {
+    const fn = vi.fn();
+    fn.mockRejectedValueOnce(new ServiceNowTimeoutError('timed out'));
     fn.mockResolvedValueOnce(new Response('ok', { status: 200 }));
     const res = await withRetry(fn, { maxAttempts: 3, baseDelayMs: 1, jitterPct: 0 });
     expect(res.status).toBe(200);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHttpClient } from './client.js';
-import { ReadOnlyViolationError } from '../errors.js';
+import { ReadOnlyViolationError, ServiceNowTimeoutError } from '../errors.js';
 import type { ServerConfig } from '../config.js';
 
 const cfgBasic: ServerConfig = {
@@ -8,12 +8,14 @@ const cfgBasic: ServerConfig = {
   auth: { kind: 'basic', user: 'u', password: 'p' },
   cache: { ttlMs: 0, maxEntries: 0 },
   transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
+  requestTimeoutMs: 30_000,
 };
 const cfgBearer: ServerConfig = {
   instanceUrl: 'https://example.service-now.com',
   auth: { kind: 'bearer', token: 'abc' },
   cache: { ttlMs: 0, maxEntries: 0 },
   transport: { kind: 'stdio', host: '127.0.0.1', port: 3000 },
+  requestTimeoutMs: 30_000,
 };
 
 function fakeFetch(): {
@@ -116,6 +118,30 @@ function fakeFetchSequence(responses: Response[]): {
   }) as typeof fetch;
   return { fn, calls };
 }
+
+function hangingFetch(): typeof fetch {
+  return (async (_url: string | URL, init?: RequestInit) => {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+    });
+  }) as typeof fetch;
+}
+
+describe('createHttpClient — request timeout', () => {
+  it('throws ServiceNowTimeoutError once the request exceeds requestTimeoutMs', async () => {
+    const cfg: ServerConfig = { ...cfgBasic, requestTimeoutMs: 5 };
+    const client = createHttpClient(cfg, hangingFetch());
+    await expect(client.request('/x')).rejects.toBeInstanceOf(ServiceNowTimeoutError);
+  });
+
+  it('lets a request that finishes before the timeout resolve normally', async () => {
+    const { fn } = fakeFetch();
+    const cfg: ServerConfig = { ...cfgBasic, requestTimeoutMs: 30_000 };
+    const client = createHttpClient(cfg, fn);
+    const res = await client.request('/x');
+    expect(res.status).toBe(200);
+  });
+});
 
 describe('createHttpClient — 401 retry', () => {
   it('retries the request exactly once after a 401 and surfaces the second response', async () => {

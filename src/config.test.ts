@@ -94,6 +94,22 @@ describe('loadConfig', () => {
     ).toThrow(/SCHEMA_CACHE_MAX_ENTRIES/);
   });
 
+  it('defaults SNOW_REQUEST_TIMEOUT_MS to 30000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.requestTimeoutMs).toBe(30_000);
+  });
+
+  it('parses SNOW_REQUEST_TIMEOUT_MS', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SNOW_REQUEST_TIMEOUT_MS: '5000' });
+    expect(cfg.requestTimeoutMs).toBe(5000);
+  });
+
+  it('rejects SNOW_REQUEST_TIMEOUT_MS below 1', () => {
+    expect(() =>
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SNOW_REQUEST_TIMEOUT_MS: '0' }),
+    ).toThrow(/SNOW_REQUEST_TIMEOUT_MS/);
+  });
+
   it('selects oauth_client_credentials when SNOW_OAUTH_CLIENT_ID and SNOW_OAUTH_CLIENT_SECRET are set', () => {
     const cfg = loadConfig({
       ...BASE,

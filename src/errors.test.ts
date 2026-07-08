@@ -7,6 +7,7 @@ import {
   ServiceNowNotFoundError,
   ServiceNowRateLimitError,
   ServiceNowServerError,
+  ServiceNowTimeoutError,
 } from './errors.js';
 
 describe('error classes', () => {
@@ -40,5 +41,12 @@ describe('error classes', () => {
     const e = new ServiceNowRateLimitError(429, null, 'slow down', 5000);
     expect(e.retryAfterMs).toBe(5000);
     expect(e.name).toBe('ServiceNowRateLimitError');
+  });
+
+  it('ServiceNowTimeoutError has correct name and message', () => {
+    const e = new ServiceNowTimeoutError('ServiceNow request timed out after 30000ms');
+    expect(e).toBeInstanceOf(Error);
+    expect(e.name).toBe('ServiceNowTimeoutError');
+    expect(e.message).toBe('ServiceNow request timed out after 30000ms');
   });
 });

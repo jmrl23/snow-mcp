@@ -19,6 +19,7 @@ export interface ServerConfig {
   auth: AuthConfig;
   cache: CacheConfig;
   transport: TransportConfig;
+  requestTimeoutMs: number;
 }
 
 const REQUIRED_AUTH_HINT =
@@ -71,6 +72,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     maxEntries: parseIntEnv(env, 'SCHEMA_CACHE_MAX_ENTRIES', 256, { min: 1 }),
   };
 
+  const requestTimeoutMs = parseIntEnv(env, 'SNOW_REQUEST_TIMEOUT_MS', 30_000, { min: 1 });
+
   const transportKind = (env.MCP_TRANSPORT?.trim() || 'stdio') as string;
   if (transportKind !== 'stdio' && transportKind !== 'http') {
     throw new ConfigError(`MCP_TRANSPORT must be "stdio" or "http" (got: ${transportKind})`);
@@ -91,7 +94,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     transport = { kind: 'stdio', host: httpHost, port: httpPort };
   }
 
-  return { instanceUrl, auth, cache, transport };
+  return { instanceUrl, auth, cache, transport, requestTimeoutMs };
 }
 
 function parseIntEnv(

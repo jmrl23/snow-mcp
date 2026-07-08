@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toMcpResult, runTool } from './tool-helpers.js';
-import { ServiceNowAuthError, ServiceNowNotFoundError } from '../errors.js';
+import { ServiceNowAuthError, ServiceNowNotFoundError, ServiceNowTimeoutError } from '../errors.js';
 
 describe('toMcpResult', () => {
   it('wraps a successful value as a JSON content block', () => {
@@ -37,6 +37,15 @@ describe('runTool', () => {
     });
     expect(out.isError).toBe(true);
     expect((out.content?.[0] as { text: string }).text).toContain('auth_error');
+  });
+
+  it('maps ServiceNowTimeoutError to a timeout error block', async () => {
+    const out = await runTool(async () => {
+      throw new ServiceNowTimeoutError('ServiceNow request timed out after 30000ms');
+    });
+    expect(out.isError).toBe(true);
+    const text = (out.content?.[0] as { text: string }).text;
+    expect(text).toContain('timeout');
   });
 
   it('maps unknown errors to internal_error block without leaking stack', async () => {

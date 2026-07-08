@@ -1,4 +1,4 @@
-import { ReadOnlyViolationError } from '../errors.js';
+import { ReadOnlyViolationError, ServiceNowTimeoutError } from '../errors.js';
 import type { ServerConfig } from '../config.js';
 import { createAuthProvider, type AuthProvider } from '../servicenow/auth/index.js';
 
@@ -39,7 +39,18 @@ export function createHttpClient(
       const headers = new Headers(opts.headers);
       headers.set('Authorization', await authProvider.getAuthHeader());
       headers.set('Accept', 'application/json');
-      return fetchImpl(url.toString(), { method, headers, signal: opts.signal });
+      const timeoutSignal = AbortSignal.timeout(config.requestTimeoutMs);
+      const signal = opts.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;
+      try {
+        return await fetchImpl(url.toString(), { method, headers, signal });
+      } catch (err) {
+        if (err instanceof Error && err.name === 'TimeoutError') {
+          throw new ServiceNowTimeoutError(
+            `ServiceNow request timed out after ${config.requestTimeoutMs}ms`,
+          );
+        }
+        throw err;
+      }
     };
 
     const first = await send();
