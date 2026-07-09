@@ -33,6 +33,10 @@ ENV MCP_TRANSPORT=http
 ENV MCP_HTTP_HOST=0.0.0.0
 ENV MCP_HTTP_PORT=17880
 
+WORKDIR /app/data
+ENV CACHE_DB_PATH=/app/data/cache.sqlite
+WORKDIR /app
+
 EXPOSE 17880
 
 # The `:nonroot` base tag already runs as the nonroot user; ENTRYPOINT is
