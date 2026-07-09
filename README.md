@@ -182,16 +182,30 @@ The HTTP transport binds to localhost by default. To expose it to other machines
 
 When `MCP_TRANSPORT=http`, every request to `/mcp` must include `Authorization: Bearer <MCP_AUTH_TOKEN>`. Missing or wrong tokens get a `401`. The server refuses to start if `MCP_AUTH_TOKEN` is unset or blank under http. Generate a strong value with `openssl rand -base64 32` and treat it like any other secret.
 
-### Schema cache
+### Resource cache
 
-`describe_table` and `list_tables` cache results to avoid repeated `sys_dictionary` and `sys_db_object` lookups. The HTTP transport uses an in-memory LRU cache; stdio is stateless and fetches fresh on every call. Defaults:
+`describe_table`, `list_tables`, `query_table`, `get_record`, `aggregate`,
+`run_saved_report`, `get_user_context`, and the `servicenow://tables`
+resource are all cached in a local `node:sqlite` database — on **both**
+stdio and HTTP transports. `get_attachment` is never cached (binary,
+potentially large). The cache file is local to the running container or
+process, gitignored, and safe to delete at any time; it is never treated
+as a source of truth.
 
-| Variable                   | Default  | Notes                                             |
-| -------------------------- | -------- | ------------------------------------------------- |
-| `SCHEMA_CACHE_TTL_MS`      | `300000` | 5 minutes. Set to `0` to disable the cache.       |
-| `SCHEMA_CACHE_MAX_ENTRIES` | `256`    | Hard cap on cached entries (http transport only). |
+Three TTL tiers, each independently disabled by setting it to `0`:
 
-After a schema customization in ServiceNow, restart the server or wait for the TTL to expire.
+| Variable              | Default                  | Tier applies to                                                                      |
+| --------------------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| `CACHE_TTL_LONG_MS`   | `3600000`                | `describe_table`, `list_tables`, `servicenow://tables` (1h)                          |
+| `CACHE_TTL_MEDIUM_MS` | `900000`                 | `get_user_context` (15m)                                                             |
+| `CACHE_TTL_SHORT_MS`  | `45000`                  | `query_table`, `get_record`, `aggregate`, `run_saved_report` (45s)                   |
+| `CACHE_MAX_ENTRIES`   | `1000`                   | Global row cap across all cached kinds.                                              |
+| `CACHE_DB_PATH`       | `.cache/snow-mcp.sqlite` | Sqlite file location. In the Docker image this defaults to `/app/data/cache.sqlite`. |
+
+Call the `clear_cache` tool to force a fresh read before the TTL expires —
+pass no arguments to clear everything, or `{ "kind": "record" }` (etc.) to
+scope the clear to one cache kind (`schema`, `catalog`, `user_context`,
+`record`, `aggregate`, `report`).
 
 ### Identity resolution
 
@@ -490,6 +504,17 @@ v1 supports **list** reports only.
 Return the authenticated user (`user_name`, `sys_id`, `name`, `email`),
 their roles, and their group memberships. No inputs.
 
+### `clear_cache`
+
+Clear cached ServiceNow data so the next matching read is fetched live.
+Purely local — never touches the ServiceNow API.
+
+| Arg    | Type                                                                      | Required | Description                                |
+| ------ | ------------------------------------------------------------------------- | -------- | ------------------------------------------ |
+| `kind` | `schema` / `catalog` / `user_context` / `record` / `aggregate` / `report` | no       | Limit the clear to one kind. Omit for all. |
+
+Returns `{ clearedCount }`.
+
 ---
 
 ## Resources
@@ -778,8 +803,10 @@ snow-mcp/
 │   ├── servicenow/
 │   │   ├── client.ts         # composes the per-API modules
 │   │   ├── auth/             # AuthProvider + basic / bearer / oauth-cc
-│   │   ├── schema-cache.ts   # TTL+LRU cache used by describe_table/list_tables
 │   │   └── …                 # one file per ServiceNow API surface
+│   ├── cache/
+│   │   ├── resource-cache.ts # node:sqlite cache, tiered TTLs, used by every cacheable tool
+│   │   └── stable-stringify.ts
 │   └── mcp/
 │       ├── server.ts         # registers tools + resources
 │       ├── tool-helpers.ts

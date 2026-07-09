@@ -62,3 +62,10 @@ export class ServiceNowClientError extends ServiceNowError {
     this.name = 'ServiceNowClientError';
   }
 }
+
+export class ServiceNowTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ServiceNowTimeoutError';
+  }
+}

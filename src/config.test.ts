@@ -61,37 +61,73 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...BASE, SNOW_USER: 'u' })).toThrow(ConfigError);
   });
 
-  it('defaults SCHEMA_CACHE_TTL_MS to 300000', () => {
+  it('defaults CACHE_TTL_LONG_MS to 3600000', () => {
     const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
-    expect(cfg.cache.ttlMs).toBe(300_000);
+    expect(cfg.cache.ttlLongMs).toBe(3_600_000);
   });
 
-  it('defaults SCHEMA_CACHE_MAX_ENTRIES to 256', () => {
+  it('defaults CACHE_TTL_MEDIUM_MS to 900000', () => {
     const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
-    expect(cfg.cache.maxEntries).toBe(256);
+    expect(cfg.cache.ttlMediumMs).toBe(900_000);
   });
 
-  it('parses SCHEMA_CACHE_TTL_MS=0 as disabled', () => {
-    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_TTL_MS: '0' });
-    expect(cfg.cache.ttlMs).toBe(0);
+  it('defaults CACHE_TTL_SHORT_MS to 45000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.cache.ttlShortMs).toBe(45_000);
   });
 
-  it('rejects non-integer SCHEMA_CACHE_TTL_MS', () => {
-    expect(() =>
-      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_TTL_MS: 'abc' }),
-    ).toThrow(/SCHEMA_CACHE_TTL_MS/);
+  it('defaults CACHE_MAX_ENTRIES to 1000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.cache.maxEntries).toBe(1000);
   });
 
-  it('rejects negative SCHEMA_CACHE_TTL_MS', () => {
-    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_TTL_MS: '-1' })).toThrow(
-      /SCHEMA_CACHE_TTL_MS/,
+  it('defaults CACHE_DB_PATH to .cache/snow-mcp.sqlite', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.cache.dbPath).toBe('.cache/snow-mcp.sqlite');
+  });
+
+  it('trims and uses a custom CACHE_DB_PATH', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', CACHE_DB_PATH: '  /data/x.sqlite  ' });
+    expect(cfg.cache.dbPath).toBe('/data/x.sqlite');
+  });
+
+  it('parses CACHE_TTL_LONG_MS=0 as disabled', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', CACHE_TTL_LONG_MS: '0' });
+    expect(cfg.cache.ttlLongMs).toBe(0);
+  });
+
+  it('rejects non-integer CACHE_TTL_LONG_MS', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', CACHE_TTL_LONG_MS: 'abc' })).toThrow(
+      /CACHE_TTL_LONG_MS/,
     );
   });
 
-  it('rejects SCHEMA_CACHE_MAX_ENTRIES below 1', () => {
+  it('rejects negative CACHE_TTL_LONG_MS', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', CACHE_TTL_LONG_MS: '-1' })).toThrow(
+      /CACHE_TTL_LONG_MS/,
+    );
+  });
+
+  it('rejects CACHE_MAX_ENTRIES below 1', () => {
+    expect(() => loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', CACHE_MAX_ENTRIES: '0' })).toThrow(
+      /CACHE_MAX_ENTRIES/,
+    );
+  });
+
+  it('defaults SNOW_REQUEST_TIMEOUT_MS to 30000', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't' });
+    expect(cfg.requestTimeoutMs).toBe(30_000);
+  });
+
+  it('parses SNOW_REQUEST_TIMEOUT_MS', () => {
+    const cfg = loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SNOW_REQUEST_TIMEOUT_MS: '5000' });
+    expect(cfg.requestTimeoutMs).toBe(5000);
+  });
+
+  it('rejects SNOW_REQUEST_TIMEOUT_MS below 1', () => {
     expect(() =>
-      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SCHEMA_CACHE_MAX_ENTRIES: '0' }),
-    ).toThrow(/SCHEMA_CACHE_MAX_ENTRIES/);
+      loadConfig({ ...BASE, SNOW_OAUTH_TOKEN: 't', SNOW_REQUEST_TIMEOUT_MS: '0' }),
+    ).toThrow(/SNOW_REQUEST_TIMEOUT_MS/);
   });
 
   it('selects oauth_client_credentials when SNOW_OAUTH_CLIENT_ID and SNOW_OAUTH_CLIENT_SECRET are set', () => {

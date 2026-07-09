@@ -6,8 +6,11 @@ export type AuthConfig =
   | { kind: 'oauth_client_credentials'; clientId: string; clientSecret: string };
 
 export interface CacheConfig {
-  ttlMs: number;
+  ttlLongMs: number;
+  ttlMediumMs: number;
+  ttlShortMs: number;
   maxEntries: number;
+  dbPath: string;
 }
 
 export type TransportConfig =
@@ -19,6 +22,7 @@ export interface ServerConfig {
   auth: AuthConfig;
   cache: CacheConfig;
   transport: TransportConfig;
+  requestTimeoutMs: number;
 }
 
 const REQUIRED_AUTH_HINT =
@@ -67,9 +71,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   }
 
   const cache: CacheConfig = {
-    ttlMs: parseIntEnv(env, 'SCHEMA_CACHE_TTL_MS', 300_000, { min: 0 }),
-    maxEntries: parseIntEnv(env, 'SCHEMA_CACHE_MAX_ENTRIES', 256, { min: 1 }),
+    ttlLongMs: parseIntEnv(env, 'CACHE_TTL_LONG_MS', 3_600_000, { min: 0 }),
+    ttlMediumMs: parseIntEnv(env, 'CACHE_TTL_MEDIUM_MS', 900_000, { min: 0 }),
+    ttlShortMs: parseIntEnv(env, 'CACHE_TTL_SHORT_MS', 45_000, { min: 0 }),
+    maxEntries: parseIntEnv(env, 'CACHE_MAX_ENTRIES', 1000, { min: 1 }),
+    dbPath: env.CACHE_DB_PATH?.trim() || '.cache/snow-mcp.sqlite',
   };
+
+  const requestTimeoutMs = parseIntEnv(env, 'SNOW_REQUEST_TIMEOUT_MS', 30_000, { min: 1 });
 
   const transportKind = (env.MCP_TRANSPORT?.trim() || 'stdio') as string;
   if (transportKind !== 'stdio' && transportKind !== 'http') {
@@ -91,7 +100,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     transport = { kind: 'stdio', host: httpHost, port: httpPort };
   }
 
-  return { instanceUrl, auth, cache, transport };
+  return { instanceUrl, auth, cache, transport, requestTimeoutMs };
 }
 
 function parseIntEnv(

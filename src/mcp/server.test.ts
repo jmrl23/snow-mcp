@@ -12,9 +12,17 @@ function fakeClient(): ServiceNowClient {
   } as unknown as ServiceNowClient;
 }
 
+const DISABLED_CACHE_CONFIG = {
+  dbPath: ':memory:',
+  ttlLongMs: 0,
+  ttlMediumMs: 0,
+  ttlShortMs: 0,
+  maxEntries: 1,
+};
+
 describe('createMcpServer', () => {
-  it('registers the 8 tools and the tables resource', () => {
-    const server = createMcpServer(fakeClient(), createServerCaches({ ttlMs: 0, maxEntries: 1 }));
+  it('registers the 9 tools and the tables resource', () => {
+    const server = createMcpServer(fakeClient(), createServerCaches(DISABLED_CACHE_CONFIG));
     // McpServer exposes lower-level Server via .server. We just confirm it built.
     expect(server.server).toBeDefined();
     // Indirect check: introspect registered tools via the internal map (test-only access).
@@ -23,6 +31,7 @@ describe('createMcpServer', () => {
     expect(Object.keys(tools).sort()).toEqual(
       [
         'aggregate',
+        'clear_cache',
         'describe_table',
         'get_attachment',
         'get_record',

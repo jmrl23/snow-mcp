@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
+import type { ResourceCache } from '../../cache/resource-cache.js';
+import { stableStringify } from '../../cache/stable-stringify.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 
 export const runSavedReportInput = {
@@ -17,18 +19,27 @@ export interface RunSavedReportTool {
   handler(input: { report_sys_id: string; limit?: number; offset?: number }): Promise<McpResult>;
 }
 
-export function createRunSavedReportTool(client: ServiceNowClient): RunSavedReportTool {
+export function createRunSavedReportTool(
+  client: ServiceNowClient,
+  cache: ResourceCache,
+): RunSavedReportTool {
   return {
     name: 'run_saved_report',
     description:
       'Execute a saved ServiceNow report (list type) by sys_id. Returns the resulting records plus the report definition.',
     inputShape: runSavedReportInput,
     handler: (input) =>
-      runTool(() =>
-        client.report.runSavedReport(input.report_sys_id, {
+      runTool(async () => {
+        const key = stableStringify(input);
+        const cached = await cache.get('report', key);
+        if (cached !== undefined) return cached;
+
+        const out = await client.report.runSavedReport(input.report_sys_id, {
           limit: input.limit,
           offset: input.offset,
-        }),
-      ),
+        });
+        await cache.set('report', key, out);
+        return out;
+      }),
   };
 }

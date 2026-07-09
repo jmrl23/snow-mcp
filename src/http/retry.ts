@@ -43,6 +43,7 @@ function shouldRetryStatus(status: number): boolean {
 
 function isRetryableError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
+  if ((err as { name?: string }).name === 'ServiceNowTimeoutError') return true;
   const code = (err as { code?: string }).code;
   return (
     code === 'ECONNRESET' ||

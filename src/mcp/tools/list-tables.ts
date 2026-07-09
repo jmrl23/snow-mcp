@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
-import type { SchemaCache } from '../../servicenow/schema-cache.js';
+import type { ResourceCache } from '../../cache/resource-cache.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 
 export const listTablesInput = {
@@ -16,7 +16,7 @@ export interface CachedRow {
   super_class?: string;
 }
 
-const ALL_KEY = '__all__';
+const ALL_KEY = 'list_tables:all';
 
 export interface ListTablesTool {
   name: 'list_tables';
@@ -27,7 +27,7 @@ export interface ListTablesTool {
 
 export function createListTablesTool(
   client: ServiceNowClient,
-  cache: SchemaCache<CachedRow[]>,
+  cache: ResourceCache,
 ): ListTablesTool {
   return {
     name: 'list_tables',
@@ -36,7 +36,7 @@ export function createListTablesTool(
     inputShape: listTablesInput,
     handler: (input) =>
       runTool(async () => {
-        let rows = await cache.get(ALL_KEY);
+        let rows = await cache.get<CachedRow[]>('catalog', ALL_KEY);
         if (!rows) {
           const out = await client.table.query<{
             name: string;
@@ -49,7 +49,7 @@ export function createListTablesTool(
             offset: 0,
           });
           rows = out.records.map(({ name, label, super_class }) => ({ name, label, super_class }));
-          await cache.set(ALL_KEY, rows);
+          await cache.set('catalog', ALL_KEY, rows);
         }
         const f = input.filter?.toLowerCase();
         return f

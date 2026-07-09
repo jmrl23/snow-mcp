@@ -4,6 +4,7 @@ import {
   ServiceNowNotFoundError,
   ServiceNowRateLimitError,
   ServiceNowServerError,
+  ServiceNowTimeoutError,
 } from '../errors.js';
 import { redact } from '../http/client.js';
 
@@ -37,6 +38,8 @@ function toErrorResult(err: unknown): McpResult {
   if (err instanceof ServiceNowServerError)
     return errorBlock('upstream_error', err.status, err.body);
   if (err instanceof ServiceNowClientError) return errorBlock('client_error', err.status, err.body);
+  if (err instanceof ServiceNowTimeoutError)
+    return errorBlock('timeout', 0, { message: err.message });
   const message = err instanceof Error ? err.message : String(err);
   return errorBlock('internal_error', 0, { message });
 }
