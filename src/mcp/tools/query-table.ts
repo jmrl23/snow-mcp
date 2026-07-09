@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
+import type { ResourceCache } from '../../cache/resource-cache.js';
+import { stableStringify } from '../../cache/stable-stringify.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 
 export const queryTableInput = {
@@ -41,7 +43,10 @@ export interface QueryTableTool {
   handler(input: Input): Promise<McpResult>;
 }
 
-export function createQueryTableTool(client: ServiceNowClient): QueryTableTool {
+export function createQueryTableTool(
+  client: ServiceNowClient,
+  cache: ResourceCache,
+): QueryTableTool {
   return {
     name: 'query_table',
     description:
@@ -49,6 +54,10 @@ export function createQueryTableTool(client: ServiceNowClient): QueryTableTool {
     inputShape: queryTableInput,
     handler: (input) =>
       runTool(async () => {
+        const key = stableStringify(input);
+        const cached = await cache.get('record', key);
+        if (cached !== undefined) return cached;
+
         const out = await client.table.query(input.table, {
           sysparmQuery: input.sysparm_query,
           fields: input.fields,
@@ -61,6 +70,7 @@ export function createQueryTableTool(client: ServiceNowClient): QueryTableTool {
         };
         if (out.total !== undefined) result.total = out.total;
         if (out.next_offset !== undefined) result.next_offset = out.next_offset;
+        await cache.set('record', key, result);
         return result;
       }),
   };

@@ -1,6 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createQueryTableTool } from './query-table.js';
 import type { ServiceNowClient } from '../../servicenow/client.js';
+import { createResourceCache } from '../../cache/resource-cache.js';
+
+const DISABLED = {
+  dbPath: ':memory:',
+  ttlLongMs: 0,
+  ttlMediumMs: 0,
+  ttlShortMs: 0,
+  maxEntries: 10,
+};
+const ENABLED = {
+  dbPath: ':memory:',
+  ttlLongMs: 60_000,
+  ttlMediumMs: 60_000,
+  ttlShortMs: 60_000,
+  maxEntries: 10,
+};
 
 describe('query_table tool', () => {
   it('passes inputs to TableApi.query and returns the result envelope', async () => {
@@ -12,7 +28,8 @@ describe('query_table tool', () => {
       report: { runSavedReport: vi.fn() },
       userContext: { getUserContext: vi.fn() },
     } as unknown as ServiceNowClient;
-    const tool = createQueryTableTool(client);
+    const cache = createResourceCache(DISABLED);
+    const tool = createQueryTableTool(client, cache);
     const out = await tool.handler({
       table: 'incident',
       sysparm_query: 'priority=1',
@@ -30,5 +47,19 @@ describe('query_table tool', () => {
     });
     const payload = JSON.parse((out.content?.[0] as { text: string }).text);
     expect(payload).toEqual({ records: [{ sys_id: '1' }], total: 100, next_offset: 1 });
+  });
+});
+
+describe('query_table tool with cache', () => {
+  it('returns the cached result on second call with identical inputs without re-querying', async () => {
+    const query = vi.fn(async () => ({ records: [{ sys_id: '1' }] }));
+    const client = { table: { query } } as unknown as ServiceNowClient;
+    const cache = createResourceCache(ENABLED);
+    const tool = createQueryTableTool(client, cache);
+
+    await tool.handler({ table: 'incident', limit: 10 });
+    await tool.handler({ table: 'incident', limit: 10 });
+
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });
