@@ -2,11 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ServiceNowClient } from '../servicenow/client.js';
 import type { CacheConfig } from '../config.js';
-import {
-  createResourceCache,
-  createNoopResourceCache,
-  type ResourceCache,
-} from '../cache/resource-cache.js';
+import { createResourceCache, type ResourceCache } from '../cache/resource-cache.js';
 import { createListTablesTool } from './tools/list-tables.js';
 import { createDescribeTableTool } from './tools/describe-table.js';
 import { createQueryTableTool } from './tools/query-table.js';
@@ -20,10 +16,6 @@ import { createTablesResource } from './resources/tables.js';
 
 export function createServerCaches(cacheConfig: CacheConfig): ResourceCache {
   return createResourceCache(cacheConfig);
-}
-
-export function createNoopServerCaches(): ResourceCache {
-  return createNoopResourceCache();
 }
 
 export function createMcpServer(client: ServiceNowClient, cache: ResourceCache): McpServer {
