@@ -1,6 +1,6 @@
 import { loadConfig, type ServerConfig } from './config.js';
 import { createServiceNowClient } from './servicenow/client.js';
-import { createMcpServer, createServerCaches, createNoopServerCaches } from './mcp/server.js';
+import { createMcpServer, createServerCaches } from './mcp/server.js';
 import { connectTransport } from './mcp/transport/index.js';
 import { redactSecrets } from './log-redact.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,24 +20,23 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): {
     throw err;
   }
 
-  // stdio is single-client and stateless: no caching.
-  const server = createMcpServer(client, createNoopServerCaches());
+  const cache = createServerCaches(config.cache);
+  const server = createMcpServer(client, cache);
   return { serverFactory: () => server, config };
 }
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const snowClient = createServiceNowClient(config);
+  const cache = createServerCaches(config.cache);
 
   if (config.transport.kind === 'http') {
-    // Caches are created once and shared across per-request server instances via closure.
-    const caches = createServerCaches(config.cache);
-    await connectTransport(() => createMcpServer(snowClient, caches), config.transport);
+    // Cache is created once and shared across per-request server instances via closure.
+    await connectTransport(() => createMcpServer(snowClient, cache), config.transport);
     return;
   }
 
-  // stdio: stateless, no caching.
-  const server = createMcpServer(snowClient, createNoopServerCaches());
+  const server = createMcpServer(snowClient, cache);
   await connectTransport(() => server, config.transport);
 }
 
