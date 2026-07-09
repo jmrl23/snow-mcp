@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
+import type { ResourceCache } from '../../cache/resource-cache.js';
+import { stableStringify } from '../../cache/stable-stringify.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 
 export const aggregateInput = {
@@ -31,20 +33,26 @@ export interface AggregateTool {
   handler(input: Input): Promise<McpResult>;
 }
 
-export function createAggregateTool(client: ServiceNowClient): AggregateTool {
+export function createAggregateTool(client: ServiceNowClient, cache: ResourceCache): AggregateTool {
   return {
     name: 'aggregate',
     description:
       'Run a ServiceNow aggregate query (count/avg/sum/min/max) optionally grouped by fields.',
     inputShape: aggregateInput,
     handler: (input) =>
-      runTool(() =>
-        client.aggregate.aggregate(input.table, {
+      runTool(async () => {
+        const key = stableStringify(input);
+        const cached = await cache.get('aggregate', key);
+        if (cached !== undefined) return cached;
+
+        const out = await client.aggregate.aggregate(input.table, {
           operation: input.operation,
           field: input.field,
           groupBy: input.group_by,
           sysparmQuery: input.sysparm_query,
-        }),
-      ),
+        });
+        await cache.set('aggregate', key, out);
+        return out;
+      }),
   };
 }
