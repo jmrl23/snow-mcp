@@ -85,7 +85,7 @@ export function createResourceCache(opts: ResourceCacheOptions): ResourceCache {
   );
   const countStmt = db.prepare('SELECT COUNT(*) as n FROM cache_entries');
   const deleteOldestStmt = db.prepare(
-    'DELETE FROM cache_entries WHERE key IN (SELECT key FROM cache_entries ORDER BY created_at ASC LIMIT ?)',
+    'DELETE FROM cache_entries WHERE key IN (SELECT key FROM cache_entries ORDER BY created_at ASC, rowid ASC LIMIT ?)',
   );
   const deleteAllStmt = db.prepare('DELETE FROM cache_entries WHERE 1 = 1');
   const deleteByKindStmt = db.prepare('DELETE FROM cache_entries WHERE kind = ?');
@@ -110,6 +110,7 @@ export function createResourceCache(opts: ResourceCacheOptions): ResourceCache {
       const ttl = tierTtl[KIND_TIER[kind]];
       if (ttl <= 0) return;
       const now = Date.now();
+      // NOTE: sweep-on-write only, no setInterval — a lingering timer previously caused a stdin-close hang.
       deleteExpiredStmt.run(now);
       upsertStmt.run(storageKey(kind, key), kind, JSON.stringify(value), now + ttl, now);
       const countRow = countStmt.get() as { n: number };
