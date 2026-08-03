@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
-import type { ResourceCache } from '../../cache/resource-cache.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 
 export const listTablesInput = {
@@ -10,14 +9,6 @@ export const listTablesInput = {
     .describe('Case-insensitive substring matched against table name and label.'),
 };
 
-export interface CachedRow {
-  name: string;
-  label: string;
-  super_class?: string;
-}
-
-const ALL_KEY = 'list_tables:all';
-
 export interface ListTablesTool {
   name: 'list_tables';
   description: string;
@@ -25,10 +16,7 @@ export interface ListTablesTool {
   handler(input: { filter?: string }): Promise<McpResult>;
 }
 
-export function createListTablesTool(
-  client: ServiceNowClient,
-  cache: ResourceCache,
-): ListTablesTool {
+export function createListTablesTool(client: ServiceNowClient): ListTablesTool {
   return {
     name: 'list_tables',
     description:
@@ -36,21 +24,21 @@ export function createListTablesTool(
     inputShape: listTablesInput,
     handler: (input) =>
       runTool(async () => {
-        let rows = await cache.get<CachedRow[]>('catalog', ALL_KEY);
-        if (!rows) {
-          const out = await client.table.query<{
-            name: string;
-            label: string;
-            super_class?: string;
-            sys_id: string;
-          }>('sys_db_object', {
-            fields: ['name', 'label', 'super_class', 'sys_id'],
-            limit: 10000,
-            offset: 0,
-          });
-          rows = out.records.map(({ name, label, super_class }) => ({ name, label, super_class }));
-          await cache.set('catalog', ALL_KEY, rows);
-        }
+        const out = await client.table.query<{
+          name: string;
+          label: string;
+          super_class?: string;
+          sys_id: string;
+        }>('sys_db_object', {
+          fields: ['name', 'label', 'super_class', 'sys_id'],
+          limit: 10000,
+          offset: 0,
+        });
+        const rows = out.records.map(({ name, label, super_class }) => ({
+          name,
+          label,
+          super_class,
+        }));
         const f = input.filter?.toLowerCase();
         return f
           ? rows.filter(

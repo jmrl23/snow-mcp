@@ -1,7 +1,5 @@
 import { z } from 'zod';
 import type { ServiceNowClient } from '../../servicenow/client.js';
-import type { ResourceCache } from '../../cache/resource-cache.js';
-import { stableStringify } from '../../cache/stable-stringify.js';
 import { runTool, type McpResult } from '../tool-helpers.js';
 import { ServiceNowNotFoundError } from '../../errors.js';
 
@@ -16,10 +14,7 @@ export interface DescribeTableTool {
   handler(input: { name: string }): Promise<McpResult>;
 }
 
-export function createDescribeTableTool(
-  client: ServiceNowClient,
-  cache: ResourceCache,
-): DescribeTableTool {
+export function createDescribeTableTool(client: ServiceNowClient): DescribeTableTool {
   return {
     name: 'describe_table',
     description:
@@ -27,10 +22,6 @@ export function createDescribeTableTool(
     inputShape: describeTableInput,
     handler: (input) =>
       runTool(async () => {
-        const key = stableStringify(input);
-        const cached = await cache.get<unknown>('schema', key);
-        if (cached !== undefined) return cached;
-
         const meta = await client.table.query<{
           name: string;
           label: string;
@@ -69,7 +60,7 @@ export function createDescribeTableTool(
           limit: 1000,
           displayValue: 'all',
         });
-        const out = {
+        return {
           name: row.name,
           label: row.label,
           parent: row.super_class?.display_value ?? null,
@@ -82,8 +73,6 @@ export function createDescribeTableTool(
             readOnly: f.read_only === 'true',
           })),
         };
-        await cache.set('schema', key, out);
-        return out;
       }),
   };
 }

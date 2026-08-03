@@ -5,14 +5,6 @@ export type AuthConfig =
   | { kind: 'basic'; user: string; password: string }
   | { kind: 'oauth_client_credentials'; clientId: string; clientSecret: string };
 
-export interface CacheConfig {
-  ttlLongMs: number;
-  ttlMediumMs: number;
-  ttlShortMs: number;
-  maxEntries: number;
-  dbPath: string;
-}
-
 export type TransportConfig =
   | { kind: 'stdio'; host: string; port: number }
   | { kind: 'http'; host: string; port: number; authToken: string };
@@ -20,7 +12,6 @@ export type TransportConfig =
 export interface ServerConfig {
   instanceUrl: string;
   auth: AuthConfig;
-  cache: CacheConfig;
   transport: TransportConfig;
   requestTimeoutMs: number;
 }
@@ -70,14 +61,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     throw new ConfigError(`SNOW_INSTANCE_URL is not a valid URL: ${rawUrl}`);
   }
 
-  const cache: CacheConfig = {
-    ttlLongMs: parseIntEnv(env, 'CACHE_TTL_LONG_MS', 3_600_000, { min: 0 }),
-    ttlMediumMs: parseIntEnv(env, 'CACHE_TTL_MEDIUM_MS', 900_000, { min: 0 }),
-    ttlShortMs: parseIntEnv(env, 'CACHE_TTL_SHORT_MS', 45_000, { min: 0 }),
-    maxEntries: parseIntEnv(env, 'CACHE_MAX_ENTRIES', 1000, { min: 1 }),
-    dbPath: env.CACHE_DB_PATH?.trim() || '.cache/snow-mcp.sqlite',
-  };
-
   const requestTimeoutMs = parseIntEnv(env, 'SNOW_REQUEST_TIMEOUT_MS', 30_000, { min: 1 });
 
   const transportKind = (env.MCP_TRANSPORT?.trim() || 'stdio') as string;
@@ -100,7 +83,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     transport = { kind: 'stdio', host: httpHost, port: httpPort };
   }
 
-  return { instanceUrl, auth, cache, transport, requestTimeoutMs };
+  return { instanceUrl, auth, transport, requestTimeoutMs };
 }
 
 function parseIntEnv(
