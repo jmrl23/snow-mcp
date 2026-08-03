@@ -1,5 +1,4 @@
 import type { ServiceNowClient } from '../../servicenow/client.js';
-import type { ResourceCache } from '../../cache/resource-cache.js';
 
 export interface ResourceContents {
   contents: Array<{ uri: string; mimeType: string; text: string }>;
@@ -13,21 +12,13 @@ export interface TablesResource {
   read(): Promise<ResourceContents>;
 }
 
-const CACHE_KEY = 'servicenow://tables';
-
-export function createTablesResource(
-  client: ServiceNowClient,
-  cache: ResourceCache,
-): TablesResource {
+export function createTablesResource(client: ServiceNowClient): TablesResource {
   return {
     uri: 'servicenow://tables',
     name: 'tables',
     description: 'Live catalog of ServiceNow tables visible to the authenticated user.',
     mimeType: 'application/json',
     async read() {
-      const cached = await cache.get<ResourceContents>('catalog', CACHE_KEY);
-      if (cached !== undefined) return cached;
-
       const out = await client.table.query<{
         name: string;
         label: string;
@@ -48,11 +39,9 @@ export function createTablesResource(
         null,
         2,
       );
-      const result: ResourceContents = {
+      return {
         contents: [{ uri: 'servicenow://tables', mimeType: 'application/json', text }],
       };
-      await cache.set('catalog', CACHE_KEY, result);
-      return result;
     },
   };
 }

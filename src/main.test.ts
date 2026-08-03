@@ -11,29 +11,26 @@ describe('buildServer', () => {
     const { serverFactory } = buildServer({
       SNOW_INSTANCE_URL: 'https://example.service-now.com',
       SNOW_OAUTH_TOKEN: 't',
-      CACHE_DB_PATH: ':memory:',
     });
     // buildServer always returns a factory; calling it yields the McpServer instance.
     expect(serverFactory()).toBeInstanceOf(McpServer);
   });
 
-  it('registers all 9 tools', () => {
+  it('registers all 8 tools', () => {
     const { serverFactory } = buildServer({
       SNOW_INSTANCE_URL: 'https://example.service-now.com',
       SNOW_OAUTH_TOKEN: 't',
-      CACHE_DB_PATH: ':memory:',
     });
     const server = serverFactory();
     const tools = (server as unknown as { _registeredTools: Record<string, unknown> })
       ._registeredTools;
-    expect(Object.keys(tools)).toHaveLength(9);
+    expect(Object.keys(tools)).toHaveLength(8);
   });
 
   it('returns a ServerConfig with transport=stdio by default', () => {
     const { config } = buildServer({
       SNOW_INSTANCE_URL: 'https://example.service-now.com',
       SNOW_OAUTH_TOKEN: 't',
-      CACHE_DB_PATH: ':memory:',
     });
     expect(config.transport.kind).toBe('stdio');
   });

@@ -1,6 +1,6 @@
 import { loadConfig, type ServerConfig } from './config.js';
 import { createServiceNowClient } from './servicenow/client.js';
-import { createMcpServer, createServerCaches } from './mcp/server.js';
+import { createMcpServer } from './mcp/server.js';
 import { connectTransport } from './mcp/transport/index.js';
 import { redactSecrets } from './log-redact.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,23 +20,20 @@ export function buildServer(env: NodeJS.ProcessEnv = process.env): {
     throw err;
   }
 
-  const cache = createServerCaches(config.cache);
-  const server = createMcpServer(client, cache);
+  const server = createMcpServer(client);
   return { serverFactory: () => server, config };
 }
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const snowClient = createServiceNowClient(config);
-  const cache = createServerCaches(config.cache);
 
   if (config.transport.kind === 'http') {
-    // Cache is created once and shared across per-request server instances via closure.
-    await connectTransport(() => createMcpServer(snowClient, cache), config.transport);
+    await connectTransport(() => createMcpServer(snowClient), config.transport);
     return;
   }
 
-  const server = createMcpServer(snowClient, cache);
+  const server = createMcpServer(snowClient);
   await connectTransport(() => server, config.transport);
 }
 
